@@ -4,7 +4,7 @@ Harness-specific extensions in workbench, separate from marketplace `@pi` plugin
 
 | Path | Role |
 | --- | --- |
-| `claude/` | Claude Code–only pieces (today: `cc-status`) |
+| `claude/` | Claude Code–only pieces (today: `cc-status` and the status line) |
 
 pm and tm live in the ordinator plugin. snippets is a plain hook in `tools/snippets` ([decisions](../docs/decisions.md#what-each-piece-is)).
 

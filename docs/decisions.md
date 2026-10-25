@@ -12,7 +12,7 @@ What is decided now. When a decision changes, edit it here in place; git is the 
 |---|---|
 | `setup/` | `workstation/` (profiles, bootstrap) and `dotfiles/` (chezmoi source) |
 | `tools/` | the repo's cross-harness tools: the `workbench` CLI, agent-tmux, workspaces (`awm`), snippets |
-| `harness/claude/` | Claude Code–only pieces: cc-status |
+| `harness/claude/` | Claude Code–only pieces: cc-status, the status line |
 | `agent/` | shared rules, rulebooks, subagents, hooks, sandbox profiles, and the global skills in `skills/` |
 | `scripts/` | catalog writer, plugin lint, deploy, drift check |
 | `external/` | pinned upstreams; change the pin or fork, never edit in place |

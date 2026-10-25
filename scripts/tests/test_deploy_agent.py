@@ -3,6 +3,7 @@
 Cursor and OpenCode."""
 
 import importlib.util
+import json
 import tempfile
 import tomllib
 import unittest
@@ -59,6 +60,25 @@ class DeployAgentTests(unittest.TestCase):
             self.assertFalse((home / ".agents/AGENTS.md.pre-deploy").exists())
             # The harness copies still get the canonical rules, not the local line.
             self.assertEqual((home / ".codex/AGENTS.md").read_text(), (MODULE.AGENT / "AGENTS.md").read_text())
+
+    def test_claude_settings_are_checked_for_the_status_line_and_mods(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            settings = home / ".claude/settings.json"
+            settings.parent.mkdir()
+            settings.write_text('{"env": {"CLAUDE_CODE_PLUGIN_DIRS": "~/mods/other"}}')
+            output = self.run_main(home, "--harness", "claude", "--apply")
+            self.assertIn('"command": "$HOME/.local/bin/claude-statusline"', output)
+            self.assertIn('"CLAUDE_CODE_PLUGIN_DIRS": "~/mods/other:~/.local/share/claude-mods/cc-status"', output)
+            self.assertEqual(settings.read_text(), '{"env": {"CLAUDE_CODE_PLUGIN_DIRS": "~/mods/other"}}')
+            self.assertTrue((home / ".local/bin/claude-statusline").stat().st_mode & 0o100)
+            self.assertTrue((home / ".local/share/claude-mods/cc-status/hooks/register.tsx").is_file())
+            settings.write_text(json.dumps({
+                "statusLine": {"type": "command", "command": "$HOME/.local/bin/claude-statusline"},
+                "env": {"CLAUDE_CODE_PLUGIN_DIRS": f"{home}/.local/share/claude-mods/cc-status"}}))
+            output = self.run_main(home, "--harness", "claude")
+            self.assertNotIn("status line", output)
+            self.assertNotIn("does not load", output)
 
     def test_committed_rules_include_the_current_version(self):
         known = MODULE.committed_rules()

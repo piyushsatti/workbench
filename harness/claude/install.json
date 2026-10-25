@@ -1,0 +1,8 @@
+{"files": [
+  {"src": "statusline/claude-statusline", "dest": "~/.local/bin/claude-statusline", "mode": "0755"},
+  {"src": "cc-status/.claude-plugin/plugin.json", "dest": "~/.local/share/claude-mods/cc-status/.claude-plugin/plugin.json"},
+  {"src": "cc-status/hooks/hooks.json", "dest": "~/.local/share/claude-mods/cc-status/hooks/hooks.json"},
+  {"src": "cc-status/hooks/register.tsx", "dest": "~/.local/share/claude-mods/cc-status/hooks/register.tsx"},
+  {"src": "cc-status/tsconfig.json", "dest": "~/.local/share/claude-mods/cc-status/tsconfig.json"},
+  {"src": "cc-status/types/index.d.ts", "dest": "~/.local/share/claude-mods/cc-status/types/index.d.ts"}
+]}
