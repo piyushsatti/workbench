@@ -84,9 +84,10 @@ live_model_id=$(echo "$input" | jq -r '.model.id // empty')
 
 model=""
 if [ -n "$live_model_id" ]; then
-  model=$(python3 -c "
+  # The id goes in as an argument, never into the Python source.
+  model=$(python3 - "$live_model_id" 2>/dev/null <<'PY'
 import sys
-mid = '$live_model_id'
+mid = sys.argv[1]
 for family in ('haiku', 'sonnet', 'opus', 'fable', 'mythos'):
     if family not in mid:
         continue
@@ -102,7 +103,8 @@ for family in ('haiku', 'sonnet', 'opus', 'fable', 'mythos'):
     print(family.capitalize() + ' ' + version)
     sys.exit(0)
 print(mid)
-" 2>/dev/null)
+PY
+)
 fi
 
 # Fallback to harness display_name if model.id is missing or unparseable
