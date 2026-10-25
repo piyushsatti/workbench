@@ -1,6 +1,7 @@
 """Recovery and repeat-run behavior for the files the installer manages."""
 
 import importlib.util
+import os
 import subprocess
 import tempfile
 import unittest
@@ -77,10 +78,12 @@ class ConfigurationTests(unittest.TestCase):
         )
         (seed / "content").write_text("pinned\n")
         subprocess.run(["git", "-C", str(seed), "add", "content"], check=True)
+        # Without the machine's global config, whose hooks may refuse the fixture identity.
         subprocess.run(
             ["git", "-C", str(seed), "commit", "-m", "fixture"],
             check=True,
             capture_output=True,
+            env={**os.environ, "GIT_CONFIG_GLOBAL": os.devnull},
         )
         commit = subprocess.run(
             ["git", "-C", str(seed), "rev-parse", "HEAD"],

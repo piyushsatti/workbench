@@ -2,8 +2,6 @@
 [[ -f ~/.bashrc ]] && source ~/.bashrc
 {{- if eq .chezmoi.os "darwin" }}
 
-# macOS: keep the machine awake while Claude Code runs
-alias claude='caffeinate -dis claude'
 alias tailscale="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
 {{- end }}
 

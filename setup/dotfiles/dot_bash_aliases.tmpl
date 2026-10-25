@@ -19,5 +19,15 @@ alias ....='cd ../../..'
 # Tmux: attach-or-create main session
 alias tm='tmux new -A -s main'
 
+# Claude Code goes through workspaces when it's installed: allowed folders only, inside tmux,
+# every launch logged. `command claude` goes around it.
+if command -v workspaces >/dev/null 2>&1; then
+{{- if eq .chezmoi.os "darwin" }}
+  claude() { caffeinate -dis workspaces run . claude "$@"; }   # macOS: stay awake while it runs
+{{- else }}
+  claude() { workspaces run . claude "$@"; }
+{{- end }}
+fi
+
 # Machine-local aliases (not managed by chezmoi)
 [[ -f ~/.bash_aliases.local ]] && source ~/.bash_aliases.local
