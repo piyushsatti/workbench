@@ -23,7 +23,7 @@ entry is printed for the user to run, never run here.
 See agent/docs/harness-parity.md for the sources.
 
 Never written, only checked: ~/.claude/CLAUDE.md (its format is the user's; it must import the canonical rules),
-a ~/.codex/AGENTS.md or ~/.config/opencode/AGENTS.md with its own content, and every settings file (hooks, permissions and sandbox
+a ~/.agents/AGENTS.md, ~/.codex/AGENTS.md or ~/.config/opencode/AGENTS.md with its own content, and every settings file (hooks, permissions and sandbox
 profiles are merged by hand per repository).
 """
 
@@ -31,6 +31,7 @@ import argparse
 import filecmp
 import json
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -52,7 +53,6 @@ HARNESSES = ("claude", "codex", "cursor", "opencode")
 # source (relative to agent/) -> destination (relative to $HOME); directories copy file by file.
 # Shared: every harness reads these, so they deploy regardless of --harness.
 TARGETS = [
-    ("AGENTS.md", ".agents/AGENTS.md"),
     ("bin", ".agents/bin"),
     ("docs", ".agents/docs"),
     ("skills", ".agents/skills"),
@@ -158,8 +158,9 @@ HARNESS_TARGETS = {
     "cursor": [("subagents", ".cursor/agents", to_cursor, ".md")],
     "opencode": [("subagents", ".config/opencode/agents", to_opencode, ".md")],
 }
-# Harnesses that read agent/AGENTS.md only as a literal copy in their own folder (no imports).
-RULES_COPIES = {"codex": ".codex/AGENTS.md", "opencode": ".config/opencode/AGENTS.md"}
+# The copies of agent/AGENTS.md: the shared one (Claude Code imports it, Cursor's User Rules are pasted
+# from it), and the harnesses that read it only as a literal copy in their own folder (no imports).
+RULES_COPIES = {"shared": ".agents/AGENTS.md", "codex": ".codex/AGENTS.md", "opencode": ".config/opencode/AGENTS.md"}
 
 
 def state_of(path, target, text=None):
@@ -221,24 +222,47 @@ def mapped(src, dst, convert, suffix):
         yield path, target, convert
 
 
-def rules_copy(harness):
-    """Plan entry for the harness's copy of agent/AGENTS.md (RULES_COPIES), or None with a CHECK line
-    when the file has its own content.
+def committed_rules():
+    """Every committed version of agent/AGENTS.md, as bytes; empty when this checkout has no git history."""
+    try:
+        log = subprocess.run(["git", "-C", str(ROOT), "log", "--format=%H", "--", "agent/AGENTS.md"],
+                             capture_output=True, text=True, check=True).stdout.split()
+        return {subprocess.run(["git", "-C", str(ROOT), "show", f"{sha}:agent/AGENTS.md"],
+                               capture_output=True, check=True).stdout for sha in log}
+    except (OSError, subprocess.CalledProcessError):
+        return set()
 
-    The file is ours to update when it is missing, already equal to agent/AGENTS.md, or equal to the
-    deployed ~/.agents/AGENTS.md (an earlier deploy's copy). Anything else is the user's.
+
+def rules_copy(which, known=None):
+    """Plan entry for one copy of agent/AGENTS.md (RULES_COPIES), or None with a CHECK line when the
+    file has its own content.
+
+    The file is ours to update when it is missing, already equal to agent/AGENTS.md, equal to a
+    committed version of it (an earlier deploy's copy), or, for a harness copy, equal to the deployed
+    ~/.agents/AGENTS.md. Anything else is the user's: a line added by hand is never overwritten.
     """
-    src, dst = AGENT / "AGENTS.md", HOME / RULES_COPIES[harness]
+    src, dst = AGENT / "AGENTS.md", HOME / RULES_COPIES[which]
     if not dst.exists():
         return (src, dst, "new", None, None), None
-    deployed = HOME / ".agents/AGENTS.md"
-    if filecmp.cmp(src, dst, shallow=False) and not dst.is_symlink():
-        return (src, dst, "same", None, None), None
-    if not dst.is_symlink() and deployed.is_file() and filecmp.cmp(deployed, dst, shallow=False):
+    if dst.is_symlink():
         return (src, dst, "changed", None, None), None
-    name = {"codex": "Codex", "opencode": "OpenCode"}[harness]
+    if filecmp.cmp(src, dst, shallow=False):
+        return (src, dst, "same", None, None), None
+    deployed = HOME / RULES_COPIES["shared"]
+    earlier = dst.read_bytes() in (committed_rules() if known is None else known)
+    if earlier or (which != "shared" and deployed.is_file() and filecmp.cmp(deployed, dst, shallow=False)):
+        return (src, dst, "changed", None, None), None
+    if which == "shared":
+        return None, (f"CHECK   {dst} has its own content, left as is. Move what every machine should "
+                      f"read into agent/AGENTS.md; lines for this machine only can stay")
+    name = {"codex": "Codex", "opencode": "OpenCode"}[which]
     return None, (f"CHECK   {dst} has its own content, left as is. {name} reads its literal text and "
                   f"follows no pointer, so replace it by hand with a copy of agent/AGENTS.md")
+
+
+def chosen_copies(harnesses):
+    """The RULES_COPIES keys deploy handles: the shared copy always, a harness copy when it is chosen."""
+    return [k for k in RULES_COPIES if k == "shared" or k in harnesses]
 
 
 def plan(harnesses=HARNESSES):
@@ -248,11 +272,10 @@ def plan(harnesses=HARNESSES):
         for path, dst, convert in mapped(*target):
             text = convert(path.relative_to(AGENT), path.read_text()) if convert else None
             items.append((path, dst, state_of(path, dst, text), None, text))
-    for harness in RULES_COPIES:
-        if harness in harnesses:
-            entry, _ = rules_copy(harness)
-            if entry:
-                items.append(entry)
+    for which in chosen_copies(harnesses):
+        entry, _ = rules_copy(which)
+        if entry:
+            items.append(entry)
     for path, dst, mode in plugin_installs()[0]:
         items.append((path, dst, state_of(path, dst), mode, None))
     return items
@@ -277,11 +300,10 @@ def checks(harnesses=HARNESSES):
             yield f"MISSING {claude_md}: create it with the line {SHIM}"
         elif SHIM not in claude_md.read_text():
             yield f"CHECK   {claude_md} does not import {SHIM}"
-    for harness in RULES_COPIES:
-        if harness in harnesses:
-            _, line = rules_copy(harness)
-            if line:
-                yield line
+    for which in chosen_copies(harnesses):
+        _, line = rules_copy(which)
+        if line:
+            yield line
     if "cursor" in harnesses:
         yield ("CHECK   Cursor User Rules live in Cursor Settings > Rules, not a file: "
                "paste agent/AGENTS.md there by hand (not checked here)")

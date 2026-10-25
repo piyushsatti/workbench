@@ -1,5 +1,5 @@
-"""deploy_agent.py: dry run writes nothing, apply copies and backs up, CLAUDE.md and a hand-made
-~/.codex/AGENTS.md or ~/.config/opencode/AGENTS.md are never written, and subagents convert for Codex,
+"""deploy_agent.py: dry run writes nothing, apply copies and backs up, CLAUDE.md and a hand-edited
+~/.agents/AGENTS.md, ~/.codex/AGENTS.md or ~/.config/opencode/AGENTS.md are never written, and subagents convert for Codex,
 Cursor and OpenCode."""
 
 import importlib.util
@@ -32,7 +32,7 @@ class DeployAgentTests(unittest.TestCase):
             self.assertEqual(list(home.iterdir()), [])
 
     def test_apply_copies_backs_up_and_leaves_claude_md(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory() as temp, mock.patch.object(MODULE, "committed_rules", lambda: {b"old rules\n"}):
             home = Path(temp)
             (home / ".agents").mkdir()
             (home / ".agents/AGENTS.md").write_text("old rules\n")
@@ -44,6 +44,27 @@ class DeployAgentTests(unittest.TestCase):
             self.assertEqual((home / ".claude/CLAUDE.md").read_text(), "my own file\n")
             self.assertTrue((home / ".claude/agents/scrutineer.md").is_file())
             self.assertIn("up to date", self.run_main(home))
+
+    def test_hand_edited_shared_rules_are_never_overwritten(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            shared = home / ".agents/AGENTS.md"
+            shared.parent.mkdir()
+            edited = (MODULE.AGENT / "AGENTS.md").read_text() + "Memory: read this machine's index.\n"
+            shared.write_text(edited)
+            output = self.run_main(home, "--apply")
+            self.assertIn(f"CHECK   {shared} has its own content, left as is", output)
+            self.assertNotIn(f"CHANGED  {shared}", output)
+            self.assertEqual(shared.read_text(), edited)
+            self.assertFalse((home / ".agents/AGENTS.md.pre-deploy").exists())
+            # The harness copies still get the canonical rules, not the local line.
+            self.assertEqual((home / ".codex/AGENTS.md").read_text(), (MODULE.AGENT / "AGENTS.md").read_text())
+
+    def test_committed_rules_include_the_current_version(self):
+        known = MODULE.committed_rules()
+        if not known:
+            self.skipTest("no git history in this checkout")
+        self.assertIn((MODULE.AGENT / "AGENTS.md").read_bytes(), known)
 
     def test_skills_deploy_without_their_tests_and_executables(self):
         with tempfile.TemporaryDirectory() as temp:
