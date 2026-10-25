@@ -1,0 +1,28 @@
+{{- $themeName := includeTemplate "theme-name" . -}}
+{{- $t := index .themes $themeName -}}
+# tmux-status.conf: show each Claude pane's state (written by a Claude Code hook) in the window list and status-right.
+# Source AFTER the main config (the last line of ~/.tmux.conf). Section 1 replaces the window formats; section 2 prepends to status-right and checks for its marker first.
+# Pane options read: @claude_state (idle|working|waiting|done), @claude_model.
+# Lives in ~/.tmux/claude/ on purpose: tmux runs these as you, outside the Claude sandbox, so they must sit where the sandbox cannot write.
+# Managed by chezmoi from setup/dotfiles/dot_tmux/claude/ in the workbench repo.
+
+# 1. Per-window badge, drawn inside each tab after the flags, on the tab's own background so Nord's arrows still join.
+#    One glyph plus one space, so the tab width only changes when Claude starts or stops, not on every state change.
+#    Inactive tabs: working yellow, waiting red bold, done green, idle blue. Current tab: all black, since colours wash out on cyan.
+#    This sets the whole format (the Nord layout from ~/.tmux.conf plus the badge), so sourcing twice is harmless.
+set -g @cc_glyph "#{?#{==:#{@claude_state},working},●,#{?#{==:#{@claude_state},waiting},!,#{?#{==:#{@claude_state},done},✓,·}}}"
+set -g @cc_badge "#{?@claude_state,#{?#{==:#{@claude_state},working},#[fg={{ $t.yellow }}],#{?#{==:#{@claude_state},waiting},#[fg={{ $t.red }} bold],#{?#{==:#{@claude_state},done},#[fg={{ $t.green }}],#[fg={{ $t.blue }}]}}}#{E:@cc_glyph}#[nobold] ,}"
+set -g @cc_badge_cur "#{?@claude_state,#[fg=black bold]#{E:@cc_glyph}#[nobold] ,}"
+set -g window-status-format "#[fg=black,bg=brightblack,nobold,noitalics,nounderscore] #[fg={{ $t.fg }},bg=brightblack]#I #[fg={{ $t.fg }},bg=brightblack,nobold,noitalics,nounderscore] #[fg={{ $t.fg }},bg=brightblack]#W #{?window_active,*,#{?window_last_flag,-, }} #[bg=brightblack]#{E:@cc_badge}#[fg=brightblack,bg=black,nobold,noitalics,nounderscore]"
+set -g window-status-current-format "#[fg=black,bg=cyan,nobold,noitalics,nounderscore] #[fg=black,bg=cyan]#I #[fg=black,bg=cyan,nobold,noitalics,nounderscore] #[fg=black,bg=cyan]#W #{?window_active,*,#{?window_last_flag,-, }} #[bg=cyan]#{E:@cc_badge_cur}#[fg=cyan,bg=black,nobold,noitalics,nounderscore]"
+
+# 2. Other sessions' Claude windows, left of the clock. One shell call per refresh (status-interval is 1 here; raise it if that is heavy).
+set -g @cc_sr_tail "#(sh $HOME/.tmux/claude/claude-tmux-summary.sh #{q:session_name})"
+if -F "#{m:*claude-tmux-summary*,#{status-right}}" "" "set -gF status-right '#{@cc_sr_tail}#{status-right}'"
+
+# 3. Each pane's folder and branch on its top border, the way the Claude status line drew them (pane-title.sh).
+#    The pane's own folder: for a Claude pane, the one Claude started in. To turn it off: set -g pane-border-status off
+#    Shells that agent-tmux opened get a yellow tag first: they run outside the sandbox and tmux_send may have typed into them,
+#    so one Enter there runs whatever is on the line.
+set -g pane-border-status top
+set -g pane-border-format "#{?@agent-tmux_owned,#[fg=black bg={{ $t.yellow }}] agent-tmux: check before Enter #[default],}#(bash $HOME/.tmux/claude/pane-title.sh #{q:pane_current_path})"

@@ -1,0 +1,20 @@
+#!/bin/sh
+# Re-apply the local tmux-resurrect patches after every apply (idempotent):
+# save.sh refuses to link an empty save as `last`, restore.sh refuses to read one, and restore_pane
+# doubles # in saved folders and pane titles so restoring them cannot run a #() hidden in one.
+# A TPM update (prefix + U) reverts them; the next `chezmoi apply` puts them back.
+# Interim until the patch lives in a pinned fork (docs/decisions.md, Open).
+dir="$HOME/.tmux/plugins/tmux-resurrect"
+[ -d "$dir/.git" ] || exit 0
+patch=$(mktemp) || exit 1
+trap 'rm -f "$patch"' EXIT
+cat > "$patch" <<'PATCH'
+{{ include ".patches/tmux-resurrect.diff" -}}
+PATCH
+if git -C "$dir" apply --reverse --check "$patch" 2>/dev/null; then
+  exit 0
+elif git -C "$dir" apply --check "$patch" 2>/dev/null; then
+  git -C "$dir" apply "$patch" && echo "tmux-resurrect: local patches applied"
+else
+  echo "tmux-resurrect: local patches no longer apply to this version; re-check them" >&2
+fi

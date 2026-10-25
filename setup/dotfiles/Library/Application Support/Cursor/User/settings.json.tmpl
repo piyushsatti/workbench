@@ -1,0 +1,2 @@
+{{- $themeName := includeTemplate "theme-name" . -}}
+{{- includeTemplate "editor-settings.json" (dict "editor" "cursor" "theme" (index .themes $themeName) "os" .chezmoi.os) }}

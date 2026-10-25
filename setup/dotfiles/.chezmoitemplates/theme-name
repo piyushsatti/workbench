@@ -1,0 +1,3 @@
+{{- /* Resolve unsupported or empty theme values to the required Nord fallback. */ -}}
+{{- $name := toString .theme -}}
+{{- if hasKey .themes $name -}}{{- $name -}}{{- else -}}nord{{- end -}}

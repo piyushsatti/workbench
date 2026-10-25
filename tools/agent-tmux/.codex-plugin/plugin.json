@@ -1,0 +1,17 @@
+{
+  "name": "agent-tmux",
+  "version": "2026.10.22",
+  "description": "Stdio MCP server that lets an agent see and lay out its own tmux session: list, capture, new windows and splits, wait for output, and type into panes it owns without pressing Enter",
+  "author": {"name": "piyushsatti", "email": "49362334+piyushsatti@users.noreply.github.com"},
+  "license": "MIT",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Agent tmux",
+    "shortDescription": "See and lay out your own tmux session from the agent",
+    "developerName": "piyushsatti",
+    "category": "Developer Tools",
+    "capabilities": [
+      "mcp"
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'exec \"$HOME/.local/bin/snippets\" hook'",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

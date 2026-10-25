@@ -1,0 +1,23 @@
+#!/bin/sh
+{{ $themeName := includeTemplate "theme-name" . -}}
+{{ $t := index .themes $themeName -}}
+# Prints a tmux-styled one-line summary of Claude panes in OTHER sessions, for status-right.
+# Usage: claude-tmux-summary.sh <current-session-name>
+# Reads the pane options @claude_state / @claude_last written by a Claude Code hook. One tmux call per refresh.
+# CC_FAKE=<file> replaces the tmux call with a file of the same format (used by the test).
+# Lives in ~/.tmux/claude/ because tmux runs it every second outside the Claude sandbox; it must not sit in a sandbox-writable path.
+CUR="$1"
+FMT='#{session_name}|#{window_index}|#{@claude_state}|#{@claude_last}'
+if [ -n "$CC_FAKE" ]; then cat "$CC_FAKE"; else tmux list-panes -a -F "$FMT" 2>/dev/null; fi |
+awk -F'|' -v cur="$CUR" '
+  $3 == "" || $1 == cur { next }
+  {
+    glyph = "·"; col = "{{ $t.blue }}"
+    if ($3 == "working") { glyph = "●"; col = "{{ $t.yellow }}" }
+    else if ($3 == "waiting") { glyph = "!"; col = "{{ $t.red }}" }
+    else if ($3 == "done") { glyph = "✓"; col = "{{ $t.green }}" }
+    # tmux expands this output once more, so a # in a session name is doubled to show as itself.
+    name = $1; gsub(/#/, "##", name)
+    out = out sprintf("#[fg=%s]%s#[fg={{ $t.fg }}]%s:%s ", col, glyph, name, $2)
+  }
+  END { if (out != "") printf "%s#[default]", out }'

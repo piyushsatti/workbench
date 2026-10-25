@@ -1,0 +1,21 @@
+{
+  "$comment": "Copy to ~/.local/state/dream/config.json and replace every ~/notes placeholder with this machine's paths. All keys are optional; README.md explains each one.",
+  "read_first": [
+    {"path": "~/notes/guide.md", "for": "where things go, memory routing detail, memory frontmatter"},
+    {"path": "~/notes/rules/memory.md", "for": "the memory save gate"},
+    {"path": "~/notes/reviews/*-memory-review.md", "for": "the verdict words; read the newest match"}
+  ],
+  "rulebooks_dir": "~/notes/rules/",
+  "locate_hint": "find ~/notes -maxdepth 3 -name rules",
+  "routes": [
+    {"item": "How a library or tool behaves", "to": "~/notes/learnings/"},
+    {"item": "How a library or tool behaves, in a second project example-b", "to": "~/notes/example-b/learnings/"},
+    {"item": "Hosts, mounts, servers", "to": "~/notes/hosts/"},
+    {"item": "Agent harness behaviour (sandbox, settings, hooks)", "to": "~/notes/harness/"},
+    {"item": "A lesson about working as an agent that isn't checked yet", "to": "~/notes/drafts/", "then": "promote what holds up into ~/notes/learnings/"}
+  ],
+  "open_loop_tracker": "the add command of your task tracker",
+  "trash_command": "trash-put",
+  "state_dir": "~/.local/state/dream/<key>/state",
+  "run_dir": "~/.local/state/dream/<key>/runs/<date>-dream"
+}

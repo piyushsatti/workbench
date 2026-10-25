@@ -1,0 +1,49 @@
+{{- $themeName := includeTemplate "theme-name" . -}}
+-- Colorscheme from .chezmoidata/theme.yaml: {{ $themeName }}
+{{- if eq $themeName "catppuccin-mocha" }}
+return {
+  {
+    "catppuccin/nvim",
+    name = "catppuccin",
+    priority = 1000,
+    opts = {
+      flavour = "mocha",
+      integrations = {
+        telescope = true,
+        neo_tree = true,
+        which_key = true,
+        mason = true,
+        lsp_trouble = true,
+        noice = true,
+        notify = true,
+      },
+    },
+  },
+  -- Tell LazyVim to use catppuccin as the default colorscheme
+  {
+    "LazyVim/LazyVim",
+    opts = {
+      colorscheme = "catppuccin",
+    },
+  },
+}
+{{- else if eq $themeName "nord" }}
+return {
+  -- The official Nord port (formerly arcticicestudio/nord-vim)
+  {
+    "nordtheme/vim",
+    name = "nord",
+    lazy = false,
+    priority = 1000,
+  },
+  -- Tell LazyVim to use nord as the default colorscheme
+  {
+    "LazyVim/LazyVim",
+    opts = {
+      colorscheme = "nord",
+    },
+  },
+}
+{{- else }}
+{{-   fail (printf "nvim colorscheme: no mapping for theme %q" $themeName) }}
+{{- end }}

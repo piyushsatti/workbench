@@ -1,0 +1,40 @@
+{
+  "_comment": "The pi marketplace's plugins (brand pi, catalog hosted in this workbench repo). Most are a sibling repo each in ~/Source, with github where the repo lives and sha pinning the catalog entry once pushed (null until then). One with path instead lives in this repo at that folder.",
+  "owner": "piyushsatti",
+  "plugins": [
+    {
+      "name": "observational-memory",
+      "github": "piyushsatti/observational-memory",
+      "sha": null
+    },
+    {
+      "name": "rpctool",
+      "github": "piyushsatti/rpctool",
+      "sha": null
+    },
+    {
+      "name": "agent-coop",
+      "github": "piyushsatti/agent-coop",
+      "sha": null
+    },
+    {
+      "name": "ordinator",
+      "github": "piyushsatti/ordinator",
+      "sha": null
+    },
+    {
+      "name": "scriptorium",
+      "github": "piyushsatti/scriptorium",
+      "sha": null
+    },
+    {
+      "name": "manifold",
+      "github": "piyushsatti/manifold",
+      "sha": null
+    },
+    {
+      "name": "agent-tmux",
+      "path": "tools/agent-tmux"
+    }
+  ]
+}

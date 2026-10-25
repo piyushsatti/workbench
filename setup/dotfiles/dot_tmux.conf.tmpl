@@ -1,0 +1,189 @@
+{{- $themeName := includeTemplate "theme-name" . -}}
+{{- $copy := "wl-copy" -}}
+{{- $open := "xdg-open" -}}
+{{- if eq .chezmoi.os "darwin" -}}
+{{-   $copy = "pbcopy" -}}
+{{-   $open = "open" -}}
+{{- end -}}
+{{- $profile := includeTemplate "profile-name" . -}}
+{{- $linux := eq $profile "linux" -}}
+{{- $linuxFull := eq $profile "linux-full" -}}
+{{- $t := index .themes $themeName -}}
+{{- $claudeDir := dig "tmux" "claudeResurrectDir" "" . -}}
+{{- $claudeCommand := dig "tmux" "claudeResurrectCommand" "" . -}}
+# ── Tmux configuration ─────────────────────────────────────────────────
+# Managed by chezmoi — edit with `chezmoi edit ~/.tmux.conf`, then `chezmoi apply`.
+# The look: nordtheme/tmux layout, fixed-width tabs,
+# a blank line above the status bar, no state-driven terminal title. Keep those when editing.
+# Colours: ANSI names (black, brightblack, cyan) follow the terminal's theme; hex values come from
+# .chezmoidata/theme.yaml ({{ $themeName }}).
+
+set -g default-terminal "tmux-256color"
+set -g mouse on
+set -g set-clipboard on
+set -g focus-events on
+set -g allow-passthrough on
+
+# True color + OSC 52 clipboard passthrough (ghostty sets TERM=xterm-ghostty, matched by xterm*)
+set -ga terminal-overrides ",xterm*:Tc:Ms=\\E]52;c;%p2%s\\007"
+
+# Copy goes to the tmux buffer, OSC 52 and this command
+set -s copy-command '{{ $copy }}'
+
+# Override snap-injected XDG_CACHE_HOME with the correct XDG default
+set-environment -g XDG_CACHE_HOME "$HOME/.cache"
+
+# Prefix key (sensible handles C-b unbind and send-prefix)
+set -g prefix C-Space
+
+# Reload config
+bind r source-file ~/.tmux.conf \; display "Config reloaded"
+
+# Vim style pane selection
+bind h select-pane -L
+bind j select-pane -D
+bind k select-pane -U
+bind l select-pane -R
+
+# Start windows and panes at 1, not 0
+set -g base-index 1
+set -g pane-base-index 1
+set-option -g renumber-windows on
+set-option -g allow-rename off
+set-window-option -g automatic-rename off
+
+# Use Alt-arrow keys without prefix key to switch panes
+bind -n M-Left select-pane -L
+bind -n M-Right select-pane -R
+bind -n M-Up select-pane -U
+bind -n M-Down select-pane -D
+
+# Shift arrow to switch windows
+bind -n S-Left  previous-window
+bind -n S-Right next-window
+
+# Shift Alt vim keys to switch windows
+bind -n M-H previous-window
+bind -n M-L next-window
+
+# Theme layout comes from the nordtheme/tmux plugin (src/nord-status-content.conf); set lengths before it loads
+set -g status-right-length 200
+set -g status-left-length 100
+
+# Session persistence - auto save every 10 min
+set -g @resurrect-capture-pane-contents 'on'
+set -g @resurrect-processes 'vim nvim less man htop'
+# Claude is deliberately absent: tmux-claude-resurrect respawns it itself
+# with the right --resume id, so listing it here double-launches the pane.
+{{- if $linuxFull }}
+set -g @continuum-boot 'on'
+set -g @continuum-restore 'on'
+{{- else if $linux }}
+set -g @continuum-boot 'off'
+set -g @continuum-restore 'on'
+{{- else }}
+set -g @continuum-restore 'off'
+{{- end }}
+set -g @continuum-save-interval '10'
+# tmux-resurrect carries local patches (run_after_20-patch-tmux-resurrect.sh): save.sh refuses to link an
+# empty save as `last`, restore.sh refuses to read one, and restore_pane doubles # in saved folders and pane titles
+# so restoring them cannot run a #() hidden in one. A TPM update (prefix + U) reverts them until chezmoi re-applies.
+
+# Plugins
+set -g @plugin 'tmux-plugins/tpm'
+set -g @plugin 'tmux-plugins/tmux-sensible'
+set -g @plugin 'christoomey/vim-tmux-navigator'
+set -g @plugin 'nordtheme/tmux'
+set -g @plugin 'tmux-plugins/tmux-prefix-highlight'
+set -g @plugin 'tmux-plugins/tmux-cpu'
+set -g @plugin 'tmux-plugins/tmux-resurrect'
+set -g @plugin 'dcwigk/tmux-claude-resurrect'
+# The plugin reads one config dir; machines with several Claude logins name the one to read, and pin the command
+# to the real binary when `claude` is a shell function (e.g. ~/.claude-alt and ~/.local/bin/claude).
+# Set per machine in ~/.config/chezmoi/chezmoi.toml: [data.tmux] claudeResurrectDir = "...", claudeResurrectCommand = "...".
+{{- if $claudeDir }}
+set -g @claude-resurrect-claude-dir '{{ $claudeDir }}'
+{{- end }}
+{{- if $claudeCommand }}
+set -g @claude-resurrect-command '{{ $claudeCommand }}'
+{{- end }}
+set -g @plugin 'tmux-plugins/tmux-continuum'
+set -g @plugin 'fcsonline/tmux-thumbs'
+set -g @thumbs-upcase-command '{{ $open }} {}'
+set -g @plugin 'omerxx/tmux-sessionx'
+set -g @sessionx-bind 's'
+set -g @plugin 'loichyan/tmux-toggle-popup'
+
+run '~/.tmux/plugins/tpm/tpm'
+
+# Nord's own status content uses ANSI "white" for window titles and the clock, too bright against this
+# dark a background. Override to the theme foreground after the plugin has loaded.
+# The separators here are Powerline glyphs U+E0B0-E0B3 (private use, invisible in some viewers); keep them when editing these lines.
+set -g status-right "#($HOME/.tmux/plugins/tmux-continuum/scripts/continuum_save.sh)#{?client_prefix,#[fg=black]#[bg=brightcyan]#[fg=brightcyan]#[bg=black]#[nobold]#[noitalics]#[nounderscore]#[bg=brightcyan]#[fg=black]^SPACE,#[default]#[fg=default]#[bg=default]}#[default]#[fg=brightblack,bg=black,nobold,noitalics,nounderscore]#[fg={{ $t.fg }},bg=brightblack] %Y-%m-%d #[fg={{ $t.fg }},bg=brightblack,nobold,noitalics,nounderscore]#[fg={{ $t.fg }},bg=brightblack] %H:%M #[fg=cyan,bg=brightblack,nobold,noitalics,nounderscore]#[fg=black,bg=cyan,bold] #H "
+set -g window-status-format "#[fg=black,bg=brightblack,nobold,noitalics,nounderscore] #[fg={{ $t.fg }},bg=brightblack]#I #[fg={{ $t.fg }},bg=brightblack,nobold,noitalics,nounderscore] #[fg={{ $t.fg }},bg=brightblack]#W #F #[fg=brightblack,bg=black,nobold,noitalics,nounderscore]"
+
+# tmux defaults both to "reverse", which swaps fg/bg on a window's status segment and breaks nordtheme/tmux's
+# colour-matched separators. Unfixed upstream: nordtheme/tmux#101, patch open as PR #102.
+set -g window-status-activity-style none
+set -g window-status-bell-style none
+
+# A blank line ABOVE the status bar, so there is a gap between the pane and the bar.
+# Line [0] is an empty line in the terminal's own background; line [1] gets tmux's default bar format.
+# Unset first so re-sourcing starts from the defaults instead of copying the already-blank line [0].
+set -g status 2
+set -gu status-format
+run 'tmux set -g status-format[1] "$(tmux show -gv status-format[0])"; tmux set -g status-format[0] "#[fill=terminal]"'
+
+# Vi copy-mode (after TPM so it overrides the theme's mode-style)
+set-window-option -g mode-keys vi
+set -g mode-style "fg={{ $t.selection_fg }},bg={{ $t.yellow }}"
+bind-key -T copy-mode-vi v send-keys -X begin-selection
+bind-key -T copy-mode-vi C-v send-keys -X rectangle-toggle
+bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel
+bind -n M-v copy-mode
+
+# Mouse drag: copy to tmux buffer (server-wide, incl. popup) + OSC 52 + copy-command, exit copy mode
+bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel
+
+# Triple-click: select line, copy, keep selection visible
+bind-key -T root TripleClick1Pane select-pane -t= \; copy-mode -M \; send-keys -X select-line \; send-keys -X copy-pipe-no-clear
+bind-key -T copy-mode-vi TripleClick1Pane select-pane \; send-keys -X select-line \; send-keys -X copy-pipe-no-clear
+
+# Middle-click: paste from the shared tmux buffer; -p bracketed-paste prevents auto-execute
+bind-key -T root MouseDown2Pane paste-buffer -p
+
+# Escape exits copy mode (vi-style)
+bind-key -T copy-mode-vi Escape send-keys -X cancel
+
+# Auto-exit copy mode when scrolling hits the bottom
+bind -T copy-mode-vi WheelDownPane select-pane \; send-keys -X -N 5 scroll-down \; if-shell -F "#{==:#{scroll_position},0}" "send-keys -X cancel"
+
+# Splits and new windows inherit working directory
+bind \\ split-window -h -c "#{pane_current_path}"
+bind - split-window -v -c "#{pane_current_path}"
+bind c new-window -c "#{pane_current_path}"
+
+{{- if or $linux $linuxFull }}
+# Fuzzy session switcher (prefix S)
+bind S display-popup -E "tmux list-sessions -F '#{session_name}' | fzf --reverse | xargs tmux switch-client -t"
+{{- end }}
+
+# Floating scratch terminal (Alt-g) - toggleable via tmux-toggle-popup
+# A folder name is format-expanded twice on this path: toggle.sh expands -d in this pane, then the popup server's
+# new-session expands -c and -s again, and an expansion runs any #() it meets. So -d is handed over as a format
+# (expanded exactly once, by toggle.sh), and q/h doubles every # in the folder name and in the popup id, which makes
+# the popup server's expansion give back the literal name and run nothing. Known limit: a folder name containing
+# "#[" opens in ~, because tmux keeps "##[" as a style.
+set -g @popup-id-format '#{b;q/h:socket_path}/#{q/h:session_name}/#{b;q/h:pane_current_path}/{popup_name}'
+bind -n M-g run "#{@popup-toggle} -w80% -h80% -Ed'##{q/h:pane_current_path}'"
+
+# Toggle pane sync for multi-server work (prefix a)
+bind a setw synchronize-panes \; display "Sync #{?synchronize-panes,ON,OFF}"
+
+# Reorder windows (Ctrl-Shift-Arrow)
+bind -n C-S-Left swap-window -t -1 \; previous-window
+bind -n C-S-Right swap-window -t +1 \; next-window
+
+# Claude pane state badges (from the @claude_state pane option). Kept in ~/.tmux/claude/, outside the Claude sandbox's writable paths,
+# because tmux runs what this file points at as you; never source or #() anything under a source checkout.
+source-file -q ~/.tmux/claude/tmux-status.conf

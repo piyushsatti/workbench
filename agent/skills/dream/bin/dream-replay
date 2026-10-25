@@ -1,0 +1,394 @@
+#!/usr/bin/env -S python3 -I
+"""Replay Claude Code transcripts into plain-text digests for the dream pipeline.
+
+Usage:
+  dream-replay run <transcripts dir> <state dir> <out dir> [--since YYYY-MM-DD]
+  dream-replay commit <state dir>
+
+`run` reads only the lines past each file's watermark and writes one digest per
+session, ending with the open loops the session's last reply listed. It also logs
+every read or edit of a memory file to recall.tsv (date, session, tool, store,
+file). All state is staged as *.next.* files; `commit` makes them current, so a
+run whose later stages fail is simply repeated.
+`--since` sets a floor (UTC date) below which records are never replayed; it is
+stored in the state, so a resumed session cannot bring back older copied records.
+"""
+
+import json
+import re
+import sys
+from pathlib import Path
+
+LABEL_FIELDS = (
+    "description",
+    "file_path",
+    "path",
+    "relative_path",
+    "pattern",
+    "query",
+    "url",
+    "jql",
+    "cql",
+    "skill",
+    "subject",
+    "to",
+    "taskId",
+    "task_id",
+    "content_id",
+    "content_url",
+    "issueIdOrKey",
+    "pageId",
+    "name",
+    "action",
+    "prompt",
+    "command",
+)
+MAX_LABEL = 160
+LAUNCH_STUB = "Async agent launched"
+UNKNOWN_TOOL = ("?", "[?]")
+# Some replies end with these status lists, so the last one is the
+# session's own record of what was left open.
+STATUS = re.compile(r"^\**(Progressing|Deferred|Blocked)\b", re.MULTILINE)
+MEMORY_FILE = re.compile(r"/projects/([^/]+)/memory/(.+\.md)$")
+# isMeta user records are mostly harness wrappers, except messages from other agents.
+KEPT_META_ORIGINS = ("peer", "plugin")
+AGENT_MESSAGE = re.compile(r"<agent-message[^>]*>(.*?)</agent-message>", re.DOTALL)
+NOISE = re.compile(
+    r"<(local-command-caveat|local-command-stdout|command-name|command-message"
+    r"|command-args|system-reminder|bash-input|bash-stdout|bash-stderr"
+    r"|ide_opened_file|ide_selection)>.*?</\1>",
+    re.DOTALL,
+)
+COMMAND = re.compile(r"<command-name>(.*?)</command-name>", re.DOTALL)
+COMMAND_ARGS = re.compile(r"<command-args>(.*?)</command-args>", re.DOTALL)
+BASH_INPUT = re.compile(r"<bash-input>(.*?)</bash-input>", re.DOTALL)
+NOTIFICATION = re.compile(r"<task-notification>.*?</task-notification>", re.DOTALL)
+NOTE_SUMMARY = re.compile(r"<summary>(.*?)</summary>", re.DOTALL)
+NOTE_RESULT = re.compile(r"<result>(.*?)</result>", re.DOTALL)
+SECRETS = (
+    re.compile(
+        r"((?:password|passwd|secret|token|api[_-]?key)\s*[:=]\s*)\S+", re.IGNORECASE
+    ),
+    re.compile(r"(\w+://[^/\s:@]+:)[^@\s]+(@)"),
+)
+
+
+def _redact(text: str) -> str:
+    text = SECRETS[0].sub(r"\1***", text)
+    return SECRETS[1].sub(r"\1***\2", text)
+
+
+def _short(text: str) -> str:
+    line = " ".join(str(text).split())
+    return _redact(line if len(line) <= MAX_LABEL else line[: MAX_LABEL - 1] + "…")
+
+
+def _label(name: str, tool_input: dict) -> str:
+    # Some MCP tools nest the real target under inputs.
+    if isinstance(tool_input.get("inputs"), dict):
+        tool_input = {**tool_input["inputs"], "name": tool_input.get("name", "")}
+    for field in LABEL_FIELDS:
+        value = tool_input.get(field)
+        if value:
+            if field == "command":
+                value = str(value).strip().splitlines()[0]
+            return _short(value)
+    for key, value in tool_input.items():
+        if isinstance(value, str) and value and key != "cloudId":
+            return _short(value)
+    return ""
+
+
+def _tool(block: dict) -> tuple[str, str]:
+    name = block["name"]
+    return name, f"[{name}] {_label(name, block.get('input', {}))}".rstrip()
+
+
+def _result_text(content: object) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "\n".join(b.get("text", "") for b in content if isinstance(b, dict))
+    return ""
+
+
+def _error_line(text: str) -> str:
+    # A Bash failure opens with a bare "Exit code N"; the line after it says why.
+    lines = [line for line in text.splitlines() if line.strip()][:2]
+    return " | ".join(_short(line) for line in lines)
+
+
+def _clean_user_text(text: str) -> str:
+    parts = []
+    for note in NOTIFICATION.findall(text):
+        summary = NOTE_SUMMARY.search(note)
+        result = NOTE_RESULT.search(note)
+        head = summary.group(1).strip() if summary else "agent finished"
+        parts.append(f"[agent report: {head}]")
+        if result:
+            parts.append(result.group(1).strip())
+    command = COMMAND.search(text)
+    if command:
+        args = COMMAND_ARGS.search(text)
+        args = args.group(1).strip() if args else ""
+        parts.append(
+            f"[{command.group(1)} {args}]" if args else f"[{command.group(1)}]"
+        )
+    bash = BASH_INPUT.search(text)
+    if bash:
+        parts.append(f"[! {_short(bash.group(1))}]")
+    rest = NOISE.sub("", NOTIFICATION.sub("", text)).strip()
+    if rest:
+        parts.append(rest)
+    return "\n".join(parts)
+
+
+def _read_new(path: Path, offset: int) -> tuple[list[bytes], int]:
+    with path.open("rb") as handle:
+        handle.seek(offset)
+        data = handle.read()
+    end = data.rfind(b"\n") + 1  # a final line without a newline is still being written
+    return data[:end].splitlines(), offset + end
+
+
+class Session:
+    """The digest being built for one session in this run."""
+
+    def __init__(self, session_id: str) -> None:
+        self.session_id = session_id
+        self.lines: list[str] = []
+        self.sub_errors: list[str] = []
+        self.speaker = ""
+        self.first_ts = ""
+        self.last_ts = ""
+        self.from_line = 0
+        self.to_line = 0
+        self.status = ""
+        self.last_claude = ""
+
+    def end_turn(self) -> None:
+        """Take the open loops from the last reply that lists them."""
+        if self.last_claude:
+            status = STATUS.search(self.last_claude)
+            # A short reply without the block (a quick answer) doesn't close the loops listed before it.
+            if status:
+                self.status = self.last_claude[status.start() :]
+            self.last_claude = ""
+
+    def say(self, speaker: str, text: str, timestamp: str) -> None:
+        """Append a turn, writing the speaker heading only when it changes."""
+        if speaker != self.speaker:
+            stamp = f" · {timestamp[:16].replace('T', ' ')} UTC" if timestamp else ""
+            self.lines.append(f"\n**{speaker}**{stamp}")
+            self.speaker = speaker
+        self.lines.append(text)
+
+    def render(self) -> str:
+        """Return the digest as markdown."""
+        head = [
+            f"# Session {self.session_id}",
+            f"Lines {self.from_line}–{self.to_line}, {self.first_ts} to {self.last_ts}",
+        ]
+        body = head + self.lines
+        if self.status:
+            body += ["", "## Open loops at the end of this window", self.status]
+        if self.sub_errors:
+            body += ["", "## Subagent tool errors", *self.sub_errors]
+        return "\n".join(body) + "\n"
+
+
+class Replay:
+    """One run over a transcript directory."""
+
+    def __init__(self, state: dict, seen: set[str]) -> None:
+        self.state = state
+        self.seen = seen
+        self.since = state.get("since", "")
+        self.sessions: dict[str, Session] = {}
+        self.recalls: list[str] = []
+        self.stats = dict.fromkeys(
+            ("files", "new_lines", "kept", "bad", "dupes", "missing", "bytes_in"), 0
+        )
+
+    def _session(self, session_id: str) -> Session:
+        return self.sessions.setdefault(session_id, Session(session_id))
+
+    def _records(self, path: Path):
+        mark = self.state["files"].get(str(path), {"offset": 0, "line": 0})
+        try:
+            raw_lines, offset = _read_new(path, mark["offset"])
+        except FileNotFoundError:
+            self.stats["missing"] += 1
+            return
+        self.stats["files"] += 1
+        self.stats["new_lines"] += len(raw_lines)
+        self.stats["bytes_in"] += offset - mark["offset"]
+        self.state["files"][str(path)] = {
+            "offset": offset,
+            "line": mark["line"] + len(raw_lines),
+        }
+        for number, raw in enumerate(raw_lines, mark["line"] + 1):
+            try:
+                record = json.loads(raw.decode("utf-8", errors="replace"))
+            except ValueError:
+                self.stats["bad"] += 1
+                continue
+            if not isinstance(record, dict) or record.get("type") not in (
+                "user",
+                "assistant",
+            ):
+                continue
+            if record.get("isCompactSummary"):
+                continue
+            origin = record.get("origin") or {}
+            if record.get("isMeta") and origin.get("kind") not in KEPT_META_ORIGINS:
+                continue
+            if record.get("timestamp", "") < self.since:
+                continue
+            uuid = record.get("uuid")
+            if uuid in self.seen:
+                self.stats["dupes"] += 1
+                continue
+            if uuid:
+                self.seen.add(uuid)
+            yield number, record
+
+    def main_file(self, path: Path) -> None:
+        """Replay a main-session transcript into its session digest."""
+        session = self._session(path.stem)
+        pending: dict[str, tuple[str, str]] = {}
+        for number, record in self._records(path):
+            self.stats["kept"] += 1
+            stamp = record.get("timestamp", "")
+            session.from_line = session.from_line or number
+            session.to_line = number
+            session.first_ts = session.first_ts or stamp
+            session.last_ts = stamp or session.last_ts
+            content = record.get("message", {}).get("content")
+            if record.get("isMeta"):
+                self._agent_message(session, record, content)
+                continue
+            blocks = (
+                [{"type": "text", "text": content}]
+                if isinstance(content, str)
+                else content or []
+            )
+            for block in blocks:
+                kind = block.get("type")
+                is_text = kind == "text" and block["text"].strip()
+                if record["type"] == "assistant" and is_text:
+                    session.say("Claude", block["text"].strip(), "")
+                    session.last_claude = block["text"].strip()
+                elif kind == "tool_use":
+                    pending[block["id"]] = _tool(block)
+                    target = str(block.get("input", {}).get("file_path"))
+                    memory = MEMORY_FILE.search(target)
+                    if memory:
+                        self.recalls.append(
+                            f"{stamp[:10]}\t{path.stem}\t{block['name']}"
+                            f"\t{memory.group(1)}\t{memory.group(2)}"
+                        )
+                elif kind == "tool_result":
+                    tool = pending.pop(block.get("tool_use_id"), UNKNOWN_TOOL)
+                    self._tool_line(session, tool, block)
+                elif record["type"] == "user" and kind == "text":
+                    text = _clean_user_text(block["text"])
+                    if text:
+                        session.end_turn()
+                        session.say("User", text, stamp)
+        session.end_turn()
+        for _, call in pending.values():
+            session.lines.append(f"- {call} → (no result yet)")
+
+    def _agent_message(self, session: Session, record: dict, content: object) -> None:
+        origin = record.get("origin") or {}
+        text = origin.get("handbackReportText") or _result_text(content)
+        inner = AGENT_MESSAGE.search(text)
+        text = (inner.group(1) if inner else text).strip()
+        if text:
+            speaker = f"Agent report ({origin.get('name') or origin['kind']})"
+            session.say(speaker, text, "")
+
+    def _tool_line(self, session: Session, tool: tuple[str, str], block: dict) -> None:
+        name, call = tool
+        text = _result_text(block.get("content"))
+        if block.get("is_error"):
+            session.lines.append(f"- {call} → ERROR: {_error_line(text)}")
+        elif name == "Agent" and not text.startswith(LAUNCH_STUB):
+            session.lines.append(f"- {call} → report:")
+            session.say("Agent report", text.strip(), "")
+        else:
+            outcome = "launched" if name == "Agent" else "ok"
+            session.lines.append(f"- {call} → {outcome}")
+
+    def subagent_file(self, path: Path, session_id: str) -> None:
+        """Replay a subagent transcript, keeping only its tool errors."""
+        pending: dict[str, tuple[str, str]] = {}
+        for _, record in self._records(path):
+            content = record.get("message", {}).get("content")
+            for block in content if isinstance(content, list) else []:
+                if block.get("type") == "tool_use":
+                    pending[block["id"]] = _tool(block)
+                elif block.get("type") == "tool_result" and block.get("is_error"):
+                    _, call = pending.get(block.get("tool_use_id"), UNKNOWN_TOOL)
+                    error = _error_line(_result_text(block.get("content")))
+                    self._session(session_id).sub_errors.append(
+                        f"- {path.stem}: {call} → ERROR: {error}"
+                    )
+
+
+def run(transcripts: Path, state_dir: Path, out: Path, since: str) -> int:
+    """Replay new transcript lines into digests and stage the new watermark."""
+    state_file = state_dir / "state.json"
+    state = json.loads(state_file.read_text()) if state_file.exists() else {"files": {}}
+    if since:
+        state["since"] = since
+    seen_file = state_dir / "seen.txt"
+    seen = set(seen_file.read_text().split()) if seen_file.exists() else set()
+    replay = Replay(state, seen)
+    for path in sorted(transcripts.glob("*.jsonl")):
+        replay.main_file(path)
+    for path in sorted(transcripts.glob("*/subagents/**/*.jsonl")):
+        replay.subagent_file(path, path.relative_to(transcripts).parts[0])
+
+    out.mkdir(parents=True, exist_ok=True)
+    written = bytes_out = 0
+    for session in replay.sessions.values():
+        if not session.lines and not session.sub_errors:
+            continue
+        text = session.render()
+        name = f"{session.session_id}-L{session.from_line}-L{session.to_line}.md"
+        (out / name).write_text(text)
+        written += 1
+        bytes_out += len(text.encode())
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "state.next.json").write_text(json.dumps(state, indent=1))
+    (state_dir / "seen.next.txt").write_text("\n".join(sorted(replay.seen)))
+    recall_file = state_dir / "recall.tsv"
+    recalls = recall_file.read_text().splitlines() if recall_file.exists() else []
+    (state_dir / "recall.next.tsv").write_text("\n".join(recalls + replay.recalls))
+    stats = replay.stats | {
+        "digests": written,
+        "bytes_out": bytes_out,
+        "memory_reads": len(replay.recalls),
+    }
+    print(" ".join(f"{key}={value}" for key, value in stats.items()))
+    return 0
+
+
+def commit(state_dir: Path) -> int:
+    """Make the staged watermark current."""
+    for staged in state_dir.glob("*.next.*"):
+        staged.replace(state_dir / staged.name.replace(".next", ""))
+    print(f"committed {state_dir}")
+    return 0
+
+
+if __name__ == "__main__":
+    args = sys.argv[1:]
+    if args[:1] == ["commit"] and len(args) == 2:
+        sys.exit(commit(Path(args[1])))
+    if args[:1] == ["run"] and len(args) in (4, 6):
+        since = args[5] if len(args) == 6 and args[4] == "--since" else ""
+        sys.exit(run(Path(args[1]), Path(args[2]), Path(args[3]), since))
+    sys.exit(__doc__)

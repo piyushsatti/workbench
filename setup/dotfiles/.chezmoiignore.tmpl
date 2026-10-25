@@ -1,0 +1,20 @@
+README.md
+docs
+tests
+{{ if eq .chezmoi.os "darwin" }}
+.config/zellij
+# Editors keep their settings under ~/Library on macOS
+.config/Code
+.config/Cursor
+{{ else }}
+.zshrc
+.zprofile
+Library
+# Cursor is a macOS-only install for now
+.config/Cursor
+{{ end }}
+{{- if eq (includeTemplate "profile-name" .) "linux" }}
+# Headless Linux: no terminal emulator and no GUI editor settings.
+.config/ghostty
+.config/Code
+{{- end }}

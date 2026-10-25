@@ -1,0 +1,4 @@
+#!/bin/sh
+# Global applypatch-msg hook, installed by chezmoi through core.hooksPath: it only hands over to the
+# repository's own applypatch-msg hook, which core.hooksPath would otherwise skip (git-lfs, husky and the like).
+{{ template "git-hook-chain.sh" (dict "hook" "applypatch-msg" "data" .) }}

@@ -1,0 +1,72 @@
+{
+  "name": "pi",
+  "owner": {
+    "name": "piyushsatti",
+    "email": "49362334+piyushsatti@users.noreply.github.com"
+  },
+  "metadata": {
+    "description": "Plugins for Claude Code. `pi` is unrelated to Pi Agent."
+  },
+  "plugins": [
+    {
+      "name": "observational-memory",
+      "description": "Observational memory beside compaction: an observer model notes what matters as the session runs, and after each compaction the notes are added after the harness's own summary; a recall tool returns the exact transcript lines behind a note",
+      "version": "2026.10.22",
+      "source": {
+        "source": "github",
+        "repo": "piyushsatti/observational-memory"
+      }
+    },
+    {
+      "name": "rpctool",
+      "description": "Shrinks large tool results to head and tail with the full text saved to a file, and runs commands on allowlisted hosts over ssh through an MCP server",
+      "version": "2026.10.22",
+      "source": {
+        "source": "github",
+        "repo": "piyushsatti/rpctool"
+      }
+    },
+    {
+      "name": "agent-coop",
+      "description": "A shared document-review surface with a SQLite event log, browser UI, and Claude wake-up bridge.",
+      "version": "2026.10.22",
+      "source": {
+        "source": "github",
+        "repo": "piyushsatti/agent-coop"
+      }
+    },
+    {
+      "name": "ordinator",
+      "description": "Execution orchestration for a fleet of implementation sessions: one orchestrator skill that launches, relays and records; one implementation skill per ticket that plans, builds, reviews and opens a draft PR through the ticket-pr workflow; eleven stage agents with narrow tool surfaces. Configured per project by the setup skill.",
+      "version": "2026.10.22",
+      "source": {
+        "source": "github",
+        "repo": "piyushsatti/ordinator"
+      }
+    },
+    {
+      "name": "scriptorium",
+      "description": "Documentation and ticket production under a written house rulebook.",
+      "version": "2026.10.22",
+      "source": {
+        "source": "github",
+        "repo": "piyushsatti/scriptorium"
+      }
+    },
+    {
+      "name": "manifold",
+      "description": "Establish global Manifold spaces through guided discovery and interviews; model needs, requirements, systems and change.",
+      "version": "2026.10.22",
+      "source": {
+        "source": "github",
+        "repo": "piyushsatti/manifold"
+      }
+    },
+    {
+      "name": "agent-tmux",
+      "description": "Stdio MCP server that lets an agent see and lay out its own tmux session: list, capture, new windows and splits, wait for output, and type into panes it owns without pressing Enter",
+      "version": "2026.10.22",
+      "source": "./tools/agent-tmux"
+    }
+  ]
+}

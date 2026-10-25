@@ -1,0 +1,19 @@
+{{- /* Per-machine git identity. Asked once by `chezmoi init` and stored only in this
+       machine's ~/.config/chezmoi/chezmoi.toml, never in the repo. dot_gitconfig.tmpl and
+       the global pre-commit hook (dot_config/git/hooks) both read it, so they always agree.
+       To change it later, edit ~/.config/chezmoi/chezmoi.toml, then `chezmoi apply`. */ -}}
+{{- $name := promptStringOnce . "git.name" "Git commit name" -}}
+{{- $email := promptStringOnce . "git.email" "Git commit email" -}}
+{{- $signingkey := promptStringOnce . "git.signingkey" "Git signing key (blank for none)" "" -}}
+{{- if ne .chezmoi.os "darwin" -}}
+{{- $profile := env "WORKSTATION_PROFILE" -}}
+{{- if not (or (eq $profile "linux") (eq $profile "linux-full")) -}}
+{{- $profile = promptChoiceOnce . "workstation.profile" "Workstation profile" (list "linux" "linux-full") -}}
+{{- end -}}
+[data.workstation]
+  profile = {{ $profile | quote }}
+{{- end }}
+[data.git]
+  name = {{ $name | quote }}
+  email = {{ $email | quote }}
+  signingkey = {{ $signingkey | quote }}

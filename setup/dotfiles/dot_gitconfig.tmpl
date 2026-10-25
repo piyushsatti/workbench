@@ -1,0 +1,57 @@
+{{- $name := dig "git" "name" "" . -}}
+{{- $email := dig "git" "email" "" . -}}
+{{- $signingkey := dig "git" "signingkey" "" . -}}
+# Managed by chezmoi (workbench/setup/dotfiles/dot_gitconfig.tmpl). Edits here are overwritten.
+# Machine-specific settings (credential helpers, url rewrites) go in ~/.gitconfig.local.
+# It is included first, so everything below (identity, hooksPath, shared settings) wins over it.
+[include]
+	path = ~/.gitconfig.local
+{{- if $email }}
+[user]
+	name = {{ $name | quote }}
+	email = {{ $email | quote }}
+{{- if $signingkey }}
+	signingkey = {{ $signingkey | quote }}
+{{- end }}
+{{- end }}
+[core]
+	# Global hooks: pre-commit checks the commit identity, then runs the repo's own
+	# .git/hooks/pre-commit. A repo that sets its own core.hooksPath (husky,
+	# pre-commit) overrides this and skips the identity check.
+	hooksPath = ~/.config/git/hooks
+{{- /* The editor: VS Code where there is a desktop (macOS, linux-full), Neovim on headless Linux. */}}
+{{- $profile := includeTemplate "profile-name" . }}
+{{- if or (eq .chezmoi.os "darwin") (eq $profile "linux-full") }}
+	editor = code --wait
+{{- else }}
+	editor = nvim
+{{- end }}
+{{- /* Only point at a pager or ignore file this machine has: a missing pager breaks `git log`. */}}
+{{- $delta := lookPath "delta" }}
+{{- if $delta }}
+	pager = delta
+{{- end }}
+{{- if stat (joinPath .chezmoi.homeDir ".gitignore_global") }}
+	excludesfile = ~/.gitignore_global
+{{- end }}
+[init]
+	defaultBranch = main
+[pull]
+	rebase = false
+[fetch]
+	prune = true
+[push]
+	autoSetupRemote = true
+[merge]
+	conflictStyle = zdiff3
+[rerere]
+	enabled = true
+[diff]
+	colorMoved = default
+{{- if $delta }}
+[interactive]
+	diffFilter = delta --color-only
+[delta]
+	navigate = true
+	side-by-side = true
+{{- end }}

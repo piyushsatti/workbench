@@ -1,0 +1,49 @@
+# Two switchable themes. Pick one per machine in ~/.config/chezmoi/chezmoi.toml:
+#   [data]
+#     theme = "catppuccin-mocha"
+# Every themed template reads .themes (index .themes .theme). Hex values are the official palettes.
+theme: nord
+
+themes:
+  nord:
+    # https://www.nordtheme.com/docs/colors-and-palettes
+    names:
+      ghostty: Nord
+      vscode: Nord
+      vscode_icons: vs-seti
+      bat: Nord
+      btop: nord
+    bg: "#2E3440"        # nord0
+    surface: "#3B4252"   # nord1
+    overlay: "#4C566A"   # nord3
+    fg: "#D8DEE9"        # nord4
+    fg_bright: "#ECEFF4" # nord6
+    accent: "#88C0D0"    # nord8
+    blue: "#81A1C1"      # nord9
+    red: "#BF616A"       # nord11
+    orange: "#D08770"    # nord12
+    yellow: "#EBCB8B"    # nord13
+    green: "#A3BE8C"     # nord14
+    purple: "#B48EAD"    # nord15
+    selection_fg: "#232731"
+  catppuccin-mocha:
+    # https://catppuccin.com/palette (Mocha)
+    names:
+      ghostty: Catppuccin Mocha
+      vscode: Catppuccin Mocha
+      vscode_icons: catppuccin-mocha
+      bat: Catppuccin Mocha
+      btop: catppuccin_mocha   # official catppuccin/btop file, managed in dot_config/btop/themes/
+    bg: "#1E1E2E"        # base
+    surface: "#313244"   # surface0
+    overlay: "#6C7086"   # overlay0
+    fg: "#CDD6F4"        # text
+    fg_bright: "#CDD6F4" # text
+    accent: "#89DCEB"    # sky
+    blue: "#89B4FA"      # blue
+    red: "#F38BA8"       # red
+    orange: "#FAB387"    # peach
+    yellow: "#F9E2AF"    # yellow
+    green: "#A6E3A1"     # green
+    purple: "#CBA6F7"    # mauve
+    selection_fg: "#11111B" # crust

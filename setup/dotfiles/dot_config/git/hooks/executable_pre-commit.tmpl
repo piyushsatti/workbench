@@ -1,0 +1,10 @@
+#!/bin/sh
+# Global pre-commit hook, installed by chezmoi through core.hooksPath.
+# Refuses a commit whose author or committer identity is not this machine's
+# expected identity (chezmoi data git.name / git.email, asked once by `chezmoi init`).
+# `git var` resolves identity the way git itself will, so -c user.*, --author,
+# exported GIT_AUTHOR_* / GIT_COMMITTER_* and repo config are all caught.
+# Then it runs the repository's own pre-commit hook, which core.hooksPath would
+# otherwise silently skip.
+{{ template "git-identity-check.sh" (dict "hook" "pre-commit" "data" .) }}
+{{ template "git-hook-chain.sh" (dict "hook" "pre-commit" "data" .) }}

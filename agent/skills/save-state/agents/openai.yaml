@@ -1,0 +1,7 @@
+interface:
+  display_name: "Save State"
+  short_description: "Persist a resumable session checkpoint"
+  default_prompt: "Use $save-state to persist this session's verified state and learnings."
+
+policy:
+  allow_implicit_invocation: false

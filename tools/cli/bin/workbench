@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# workbench: one front door to the workbench repo's setup, dotfiles, plugin, deploy and drift scripts.
+# Each verb only calls an existing script; this file adds no logic of its own. The workbench checkout is
+# $PI_ROOT, default ~/Source/workbench.
+set -Eeuo pipefail
+
+PI_ROOT="${PI_ROOT:-$HOME/Source/workbench}"
+WORKSTATION="$PI_ROOT/setup/workstation"
+SCRIPTS="$PI_ROOT/scripts"
+
+# Repo Python for scripts/ (not bootstrap). Prefer uv when present; else python3.
+# Bootstrap still uses bare python3 for profile.py — see docs/decisions.md (Python)
+if [[ -n "${PYTHON:-}" ]]; then
+  REPO_PYTHON=("$PYTHON")
+elif command -v uv >/dev/null 2>&1 && [[ -f "$PI_ROOT/pyproject.toml" ]]; then
+  REPO_PYTHON=(uv run --project "$PI_ROOT" python)
+else
+  REPO_PYTHON=(python3)
+fi
+repo_python() { "${REPO_PYTHON[@]}" -B "$@"; }
+
+usage() {
+  cat <<'USAGE'
+usage: workbench <verb> [args]
+
+  setup [--profile NAME]      install the workstation (Ubuntu, sudo); bootstrap verifies at the end
+  dotfiles [diff|apply|status|verify]
+                              chezmoi against workbench's dotfiles (default: diff)
+  plugins [check|sync|lint]   Claude Code and Codex catalogs, then lint (default: check, a dry run plus lint)
+  deploy [--apply] [...]      agent config and executables (dry run unless --apply)
+  drift [--verbose] [--harness H,...]
+                              what has drifted on this machine (read-only)
+  doctor                      workstation verify (Ubuntu only) and drift in one report
+
+PI_ROOT selects the workbench checkout (default ~/Source/workbench).
+USAGE
+}
+
+die() { printf 'workbench: %s\n' "$*" >&2; exit 64; }
+
+[[ -d "$PI_ROOT" ]] || { printf 'workbench: no workbench checkout at %s (set PI_ROOT)\n' "$PI_ROOT" >&2; exit 78; }
+
+verb="${1:-help}"
+[[ $# -gt 0 ]] && shift
+
+case "$verb" in
+  setup)
+    [[ "$(uname -s)" == Linux ]] || die "setup installs Ubuntu 26.04 only; on $(uname -s) use 'workbench dotfiles' and 'workbench deploy'"
+    # bootstrap.sh ends with its own verify as a fresh login, which already has any new docker group;
+    # a second verify from this shell would not, and would fail `docker info`.
+    exec sudo "$WORKSTATION/bootstrap.sh" "$@"
+    ;;
+  dotfiles)
+    sub="${1:-diff}"
+    [[ $# -gt 0 ]] && shift
+    case "$sub" in
+      diff | apply | status | verify) exec chezmoi --source "$PI_ROOT/setup/dotfiles" "$sub" "$@" ;;
+      *) die "dotfiles: unknown '$sub' (diff, apply, status, verify)" ;;
+    esac
+    ;;
+  plugins)
+    sub="${1:-check}"
+    [[ $# -gt 0 ]] && shift
+    case "$sub" in
+      check) repo_python "$SCRIPTS/write_catalogs.py" "$@" && exec "${REPO_PYTHON[@]}" -B "$SCRIPTS/lint_plugins.py" ;;
+      sync) repo_python "$SCRIPTS/write_catalogs.py" --apply "$@" && exec "${REPO_PYTHON[@]}" -B "$SCRIPTS/lint_plugins.py" ;;
+      lint) exec "${REPO_PYTHON[@]}" -B "$SCRIPTS/lint_plugins.py" "$@" ;;
+      *) die "plugins: unknown '$sub' (check, sync, lint)" ;;
+    esac
+    ;;
+  deploy) exec "${REPO_PYTHON[@]}" -B "$SCRIPTS/deploy_agent.py" "$@" ;;
+  drift) exec "${REPO_PYTHON[@]}" -B "$SCRIPTS/drift_check.py" "$@" ;;
+  doctor)
+    status=0
+    if [[ "$(uname -s)" == Linux ]]; then
+      printf '== workstation\n'; "$WORKSTATION/verify.sh" || status=1
+    else
+      printf '== workstation\nSKIP   verify is Ubuntu-only\n'
+    fi
+    printf '== drift\n'; repo_python "$SCRIPTS/drift_check.py" || status=1
+    exit "$status"
+    ;;
+  help | -h | --help) usage ;;
+  *) usage >&2; exit 64 ;;
+esac

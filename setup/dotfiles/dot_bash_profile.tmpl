@@ -1,0 +1,11 @@
+# Source .bashrc for interactive shells (PATH setup lives there)
+[[ -f ~/.bashrc ]] && source ~/.bashrc
+{{- if eq .chezmoi.os "darwin" }}
+
+# macOS: keep the machine awake while Claude Code runs
+alias claude='caffeinate -dis claude'
+alias tailscale="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+{{- end }}
+
+# Machine-local additions go in ~/.bash_profile.local (not managed)
+[[ -f ~/.bash_profile.local ]] && source ~/.bash_profile.local

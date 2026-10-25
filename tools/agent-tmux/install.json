@@ -1,0 +1,5 @@
+{
+  "build": "GOTOOLCHAIN=local GOFLAGS='-trimpath -buildvcs=false' CGO_ENABLED=0 go build -C server -o ~/.tmux/claude/agent-tmux-mcp .",
+  "dest": "~/.tmux/claude/agent-tmux-mcp",
+  "files": []
+}

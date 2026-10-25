@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "agent-tmux": {
+      "type": "stdio",
+      "command": "sh",
+      "args": ["-c", "exec \"$HOME/.tmux/claude/agent-tmux-mcp\""],
+      "env": {
+        "PATH": "/usr/bin:/bin",
+        "LANG": "C.UTF-8"
+      }
+    }
+  }
+}

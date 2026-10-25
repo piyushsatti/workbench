@@ -1,0 +1,15 @@
+{
+  "profile": "linux-full",
+  "targets": [
+    ".bash_aliases",
+    ".bash_profile",
+    ".bashrc",
+    ".config/Code/User/keybindings.json",
+    ".config/Code/User/settings.json",
+    ".config/btop/btop.conf",
+    ".config/ghostty/config",
+    ".config/starship.toml",
+    ".tmux.conf"
+  ],
+  "rendered_sha256": "f6eb062b4ac713c395a1881b9c5b47bd8e547f5376fa1b3b5657863170cdd604"
+}

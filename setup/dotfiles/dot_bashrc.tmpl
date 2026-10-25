@@ -1,0 +1,151 @@
+{{- $themeName := includeTemplate "theme-name" . -}}
+{{- $profile := includeTemplate "profile-name" . -}}
+{{- $linuxProfile := or (eq $profile "linux") (eq $profile "linux-full") -}}
+# ── Bash configuration ────────────────────────────────────────────────
+# Managed by chezmoi — edit with `chezmoi edit ~/.bashrc`, then `chezmoi apply`.
+# Machine-local additions go in ~/.bashrc.local (not managed).
+
+# Exit early for non-interactive shells
+[[ $- != *i* ]] && return
+
+# Shell options
+shopt -s histappend                 # append to history, don't overwrite
+shopt -s cdspell                    # autocorrect typos in cd
+shopt -s dirspell 2>/dev/null       # autocorrect typos in tab completion (bash 4+; macOS /bin/bash is 3.2)
+HISTSIZE=10000
+HISTFILESIZE=20000
+HISTCONTROL=ignoreboth     # no duplicates, no space-prefixed cmds
+
+# Default editor for crontab, kubectl edit, gh, etc.
+export EDITOR="code --wait"
+export VISUAL="code --wait"
+# bat follows the shared theme (.chezmoidata/theme.yaml)
+export BAT_THEME="{{ (index .themes $themeName).names.bat }}"
+
+# Path setup
+export PATH="$HOME/.local/bin:$HOME/bin:$PATH"
+export PYENV_ROOT="$HOME/.pyenv"
+[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
+{{- if eq .chezmoi.os "darwin" }}
+
+# macOS: Homebrew
+eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null)"
+
+# macOS: GUI-spawned (non-login) shells miss path_helper. Appended, not prepended,
+# so Homebrew wins; /usr/local/bin may hold Docker Desktop shims.
+export PATH="$PATH:/usr/local/bin"
+
+# Node comes from Homebrew; nvm/fnm are not used.
+
+# macOS: opencode CLI, if installed
+[[ -d "$HOME/.opencode/bin" ]] && export PATH="$HOME/.opencode/bin:$PATH"
+
+# macOS: LM Studio CLI (lms), if installed
+[[ -d "$HOME/.lmstudio/bin" ]] && export PATH="$PATH:$HOME/.lmstudio/bin"
+{{- end }}
+
+# Tool init — lazy-load pyenv when the selected machine actually provides it.
+# Without this guard the wrapper functions shadow system Python and then fail.
+if type -P pyenv &>/dev/null; then
+  _lazy_pyenv() {
+    unset -f python python3 pip pyenv
+    eval "$(pyenv init - bash)"
+    "$@"
+  }
+  python()  { _lazy_pyenv python "$@"; }
+  python3() { _lazy_pyenv python3 "$@"; }
+  pip()     { _lazy_pyenv pip "$@"; }
+  pyenv()   { _lazy_pyenv pyenv "$@"; }
+fi
+
+# Completions. bash-completion@2 requires bash 4+, so it is a no-op on the
+# system bash 3.2. Replaces the completions oh-my-zsh used to supply.
+{{- if eq .chezmoi.os "darwin" }}
+if [[ -r /opt/homebrew/etc/profile.d/bash_completion.sh ]]; then
+  . /opt/homebrew/etc/profile.d/bash_completion.sh
+fi
+{{- else }}
+[[ -r /usr/share/bash-completion/bash_completion ]] && . /usr/share/bash-completion/bash_completion
+{{- end }}
+
+# Note: ~/.docker/completions holds ZSH completions (#compdef). Do not source
+# them here. Bash completions live in ~/.local/share/bash-completion/completions,
+# which bash-completion@2 loads on demand; regenerate docker's with:
+#   docker completion bash > ~/.local/share/bash-completion/completions/docker
+
+eval "$(starship init bash)"
+
+# fzf — keybindings (Ctrl+R, Ctrl+T, Alt+C) and completion
+if command -v fzf &>/dev/null; then
+  if fzf --bash &>/dev/null; then
+    eval "$(fzf --bash)"
+  else
+    # older fzf packages (apt) predate `fzf --bash`
+    [[ -f /usr/share/doc/fzf/examples/key-bindings.bash ]] && source /usr/share/doc/fzf/examples/key-bindings.bash
+    [[ -f /usr/share/bash-completion/completions/fzf ]] && source /usr/share/bash-completion/completions/fzf
+  fi
+fi
+
+# fzf defaults — bat for file preview, eza for directory preview
+{{- if $linuxProfile }}
+export FZF_DEFAULT_COMMAND='fdfind --type f --hidden --exclude .git'
+export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border --info=inline --color=fg:#D8DEE9,bg:#232731,hl:#81A1C1,fg+:#ECEFF4,bg+:#3B4252,hl+:#88C0D0,info:#EBCB8B,prompt:#BF616A,pointer:#B48EAD,marker:#A3BE8C,spinner:#B48EAD,header:#88C0D0,border:#4C566A"
+{{- else }}
+export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border --info=inline"
+{{- end }}
+export FZF_CTRL_T_OPTS="--preview 'bat --style=numbers --color=always --line-range :500 {} 2>/dev/null || batcat --style=numbers --color=always --line-range :500 {} 2>/dev/null || head -500 {}'"
+export FZF_ALT_C_OPTS="--preview 'eza --tree --level=2 --icons --color=always {} | head -200'"
+
+# zoxide — smarter cd (use: z <partial-path>), lazy-loaded
+_lazy_zoxide() {
+  unset -f z zi
+  eval "$(zoxide init bash)"
+  "$@"
+}
+z()  { _lazy_zoxide z "$@"; }
+zi() { _lazy_zoxide zi "$@"; }
+
+# SSH wrapper — marks terminal tab + tmux window with remote host
+ssh() {
+    local host=""
+    for arg in "$@"; do
+        [[ "$arg" != -* ]] && { host="$arg"; break; }
+    done
+    local label="ssh:${host:-?}"
+    printf '\033]0;%s\007' "$label"
+    [[ -n "$TMUX" ]] && tmux rename-window "$label"
+    command ssh "$@"
+    local local_name; local_name="$(hostname -s)"
+    printf '\033]0;%s\007' "$local_name"
+    [[ -n "$TMUX" ]] && tmux rename-window "$local_name"
+}
+
+# Aliases
+[[ -f ~/.bash_aliases ]] && source ~/.bash_aliases
+
+# tmux session chooser — shown when opening a new terminal outside tmux
+if command -v tmux &>/dev/null && [[ -z "$TMUX" ]]; then
+    sessions=$(tmux list-sessions 2>/dev/null)
+    if [[ -n "$sessions" ]]; then
+        echo "tmux sessions:"
+        echo "$sessions"
+        echo ""
+        echo "  t <name>   attach to session"
+        echo "  tn <name>  new session"
+        echo ""
+    fi
+fi
+t()  { tmux attach-session -t "$1"; }
+tn() { tmux new-session -s "${1:-main}"; }
+{{- if ne .chezmoi.os "darwin" }}
+
+# Linux: Qt apps under X11
+[[ "$XDG_SESSION_TYPE" == "x11" ]] && export QT_QPA_PLATFORM=xcb
+{{- end }}
+
+# uv-managed env, if present
+[[ -f "$HOME/.local/bin/env" ]] && . "$HOME/.local/bin/env"
+
+# Machine-local overrides (not managed by chezmoi)
+[[ -f ~/.bashrc.local ]] && source ~/.bashrc.local

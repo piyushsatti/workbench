@@ -1,0 +1,24 @@
+FROM ubuntu:26.04@sha256:889d056d5c6c0bfb55789ff3710681d68e50713cb562d2196dc07110599c7a6f AS recovery
+RUN useradd --create-home --shell /bin/bash workstation
+WORKDIR /opt/workstation
+
+FROM recovery AS packages
+COPY profiles/ubuntu-26.04/apt.txt profiles/ubuntu-26.04/apt.txt
+COPY defaults.yml defaults.yml
+COPY scripts/packages.sh scripts/profile.py scripts/
+RUN bash scripts/packages.sh
+
+FROM packages AS installed
+COPY bootstrap.sh verify.sh defaults.yml ./
+COPY scripts/ scripts/
+COPY profiles/ profiles/
+COPY --from=dotfiles . /opt/dotfiles/
+ENV WORKSTATION_DOTFILES_SOURCE=/opt/dotfiles
+RUN SUDO_USER=workstation ./bootstrap.sh
+RUN runuser -u workstation -- tmux new-session -d -s sentinel 'sleep 600' \
+    && SUDO_USER=workstation ./bootstrap.sh \
+    && runuser -u workstation -- tmux has-session -t sentinel
+USER workstation
+ENV HOME=/home/workstation
+ENV PATH=/home/workstation/.local/bin:/usr/local/bin:/usr/bin:/bin
+RUN ./verify.sh

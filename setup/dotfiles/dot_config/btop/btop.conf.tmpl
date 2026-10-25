@@ -1,0 +1,12 @@
+{{- $themeName := includeTemplate "theme-name" . -}}
+#? Config file for btop v. 1.4.7
+
+# Theme from .chezmoidata/theme.yaml. btop ships nord; Catppuccin Mocha comes from the
+# managed ~/.config/btop/themes/catppuccin_mocha{{ "." }}theme (official catppuccin/btop file).
+color_theme = "{{ (index .themes $themeName).names.btop | default "Default" }}"
+
+# False = use the terminal's background instead of painting btop's own.
+# Keeps btop visually continuous with ghostty/tmux.
+theme_background = False
+
+truecolor = True

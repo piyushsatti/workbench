@@ -1,0 +1,63 @@
+# External sources. Never edited in place: change the pin, or fork.
+# Read by setup/workstation/tests/test_profile.py, which checks the agents module's agent_tools.acpx entry is here.
+# Each entry: url, rev (exact commit or version), kind, used_by, and notes. Recorded 2026-10-22.
+
+tmux_plugins:   # installed by tpm from setup/dotfiles/dot_tmux.conf.tmpl; revs pinned 2026-10-22
+  tmux:
+    url: https://github.com/nordtheme/tmux
+    rev: f7b6da07ab55fe32ee5f7d62da56d8e5ac691a92
+  tmux-claude-resurrect:
+    url: https://github.com/dcwigk/tmux-claude-resurrect
+    rev: d0f956d0f391c4a3887179a1ef0bd859d17fc6c3
+  tmux-continuum:
+    url: https://github.com/tmux-plugins/tmux-continuum
+    rev: 0698e8f4b17d6454c71bf5212895ec055c578da0
+  tmux-cpu:
+    url: https://github.com/tmux-plugins/tmux-cpu
+    rev: bcb110d754ab2417de824c464730c412a3eb2769
+  tmux-prefix-highlight:
+    url: https://github.com/tmux-plugins/tmux-prefix-highlight
+    rev: 06cbb4ecd3a0a918ce355c70dc56d79debd455c7
+  tmux-resurrect:
+    url: https://github.com/tmux-plugins/tmux-resurrect
+    rev: cff343cf9e81983d3da0c8562b01616f12e8d548
+    local_patch: setup/dotfiles/.patches/tmux-resurrect.diff   # re-applied by run_after_20; fork pending
+  tmux-sensible:
+    url: https://github.com/tmux-plugins/tmux-sensible
+    rev: 25cb91f42d020f675bb0a2ce3fbd3a5d96119efa
+  tmux-sessionx:
+    url: https://github.com/omerxx/tmux-sessionx
+    rev: c9aaa1d309791871b5e8c1f9bfb91ecc5fa7da3a
+  tmux-thumbs:
+    url: https://github.com/fcsonline/tmux-thumbs
+    rev: ae91d5f7c0d989933e86409833c46a1eca521b6a
+  tmux-toggle-popup:
+    url: https://github.com/loichyan/tmux-toggle-popup
+    rev: cf00ceb92f5bc4fb2e50b86d28dbac1e50aa225a
+  tpm:
+    url: https://github.com/tmux-plugins/tpm
+    rev: e261deb1b47614eed3400089ce7197dc68acc4eb
+  vim-tmux-navigator:
+    url: https://github.com/christoomey/vim-tmux-navigator
+    rev: e41c431a0c7b7388ae7ba341f01a0d217eb3a432
+
+themes:   # single upstream files vendored into setup/dotfiles, checked by its render tests
+  catppuccin-btop:
+    url: https://github.com/catppuccin/btop
+    rev: f437574b600f1c6d932627050b15ff5153b58fa3   # main HEAD on 2026-10-22 (last commit 2024-09-23)
+    kind: vendored-file
+    path: themes/catppuccin_mocha.theme
+    sha256: 4c7469ab9bda282c1ff606aca37c9c0b84cd0cb66d041e4e7e1fed39791f4644
+    license: MIT
+    used_by: setup/dotfiles/dot_config/btop/themes/catppuccin_mocha.theme
+  nordtheme-vim:
+    url: https://github.com/nordtheme/vim
+    rev: null   # to pin: lazy.nvim installs it on the first Nord launch; not in lazy-lock.json yet
+    kind: nvim-plugin
+    used_by: setup/dotfiles/dot_config/nvim/lua/plugins/colorscheme.lua.tmpl
+
+agent_tools:
+  acpx:   # headless Agent Client Protocol client (alpha); https://github.com/openclaw/acpx
+    url: https://www.npmjs.com/package/acpx
+    rev: to pin   # pick an exact version at least two weeks old when rpctool starts using it
+    used_by: [rpctool]

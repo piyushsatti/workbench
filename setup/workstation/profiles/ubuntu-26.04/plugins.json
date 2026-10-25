@@ -1,0 +1,62 @@
+[
+  {
+    "name": "tpm",
+    "repo": "tmux-plugins/tpm",
+    "commit": "e261deb1b47614eed3400089ce7197dc68acc4eb"
+  },
+  {
+    "name": "tmux-sensible",
+    "repo": "tmux-plugins/tmux-sensible",
+    "commit": "25cb91f42d020f675bb0a2ce3fbd3a5d96119efa"
+  },
+  {
+    "name": "vim-tmux-navigator",
+    "repo": "christoomey/vim-tmux-navigator",
+    "commit": "e41c431a0c7b7388ae7ba341f01a0d217eb3a432"
+  },
+  {
+    "name": "tmux",
+    "repo": "nordtheme/tmux",
+    "commit": "f7b6da07ab55fe32ee5f7d62da56d8e5ac691a92"
+  },
+  {
+    "name": "tmux-prefix-highlight",
+    "repo": "tmux-plugins/tmux-prefix-highlight",
+    "commit": "06cbb4ecd3a0a918ce355c70dc56d79debd455c7"
+  },
+  {
+    "name": "tmux-cpu",
+    "repo": "tmux-plugins/tmux-cpu",
+    "commit": "bcb110d754ab2417de824c464730c412a3eb2769"
+  },
+  {
+    "name": "tmux-resurrect",
+    "repo": "tmux-plugins/tmux-resurrect",
+    "commit": "cff343cf9e81983d3da0c8562b01616f12e8d548"
+  },
+  {
+    "name": "tmux-claude-resurrect",
+    "repo": "dcwigk/tmux-claude-resurrect",
+    "commit": "d0f956d0f391c4a3887179a1ef0bd859d17fc6c3"
+  },
+  {
+    "name": "tmux-continuum",
+    "repo": "tmux-plugins/tmux-continuum",
+    "commit": "0698e8f4b17d6454c71bf5212895ec055c578da0"
+  },
+  {
+    "name": "tmux-thumbs",
+    "repo": "fcsonline/tmux-thumbs",
+    "commit": "ae91d5f7c0d989933e86409833c46a1eca521b6a"
+  },
+  {
+    "name": "tmux-sessionx",
+    "repo": "omerxx/tmux-sessionx",
+    "commit": "c9aaa1d309791871b5e8c1f9bfb91ecc5fa7da3a"
+  },
+  {
+    "name": "tmux-toggle-popup",
+    "repo": "loichyan/tmux-toggle-popup",
+    "commit": "cf00ceb92f5bc4fb2e50b86d28dbac1e50aa225a"
+  }
+]

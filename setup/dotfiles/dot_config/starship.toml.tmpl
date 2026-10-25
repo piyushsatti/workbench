@@ -1,0 +1,81 @@
+{{- $themeName := includeTemplate "theme-name" . -}}
+{{- $t := index .themes $themeName -}}
+# Starship config — clean and informative
+# Palette from .chezmoidata/theme.yaml; named colours below resolve through it.
+palette = "{{ $themeName }}"   # the [palettes] table is at the end: TOML keys after a table header belong to it
+
+format = """
+$username\
+$hostname\
+$directory\
+$git_branch\
+$git_status\
+$python\
+$nodejs\
+$docker_context\
+$sudo\
+$cmd_duration\
+$line_break\
+$character"""
+
+[username]
+show_always = true
+format = "[$user]($style)@"
+style_user = "bold accent"
+style_root = "bold red"
+
+[hostname]
+ssh_only = false
+format = "[$hostname]($style) "
+style = "bold yellow"
+trim_at = "."
+
+[directory]
+truncation_length = 3
+truncate_to_repo = true
+
+[git_branch]
+symbol = " "
+
+[git_status]
+ahead = "⇡${count}"
+behind = "⇣${count}"
+diverged = "⇕⇡${ahead_count}⇣${behind_count}"
+
+[python]
+symbol = " "
+detect_extensions = []
+
+[nodejs]
+symbol = " "
+
+[docker_context]
+symbol = " "
+
+[cmd_duration]
+min_time = 2_000
+format = "took [$duration]($style) "
+
+[sudo]
+disabled = false
+symbol = "🔒"
+format = "[$symbol]($style)"
+style = "bold yellow"
+
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
+
+[palettes.{{ $themeName }}]
+bg = "{{ $t.bg }}"
+surface = "{{ $t.surface }}"
+overlay = "{{ $t.overlay }}"
+fg = "{{ $t.fg }}"
+accent = "{{ $t.accent }}"
+blue = "{{ $t.blue }}"
+red = "{{ $t.red }}"
+orange = "{{ $t.orange }}"
+yellow = "{{ $t.yellow }}"
+green = "{{ $t.green }}"
+# git_branch's default style is "bold purple": nord15 / Mocha mauve.
+purple = "{{ $t.purple }}"

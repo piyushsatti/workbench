@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "name": "pi",
+  "interface": {
+    "displayName": "pi"
+  },
+  "plugins": [
+    {
+      "name": "observational-memory",
+      "description": "Observational memory beside compaction: an observer model notes what matters as the session runs, and after each compaction the notes are added after the harness's own summary; a recall tool returns the exact transcript lines behind a note",
+      "version": "2026.10.22",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/piyushsatti/observational-memory.git"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "rpctool",
+      "description": "Shrinks large tool results to head and tail with the full text saved to a file, and runs commands on allowlisted hosts over ssh through an MCP server",
+      "version": "2026.10.22",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/piyushsatti/rpctool.git"
+      },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "ordinator",
+      "description": "Execution orchestration for a fleet of implementation sessions: one orchestrator skill that launches, relays and records; one implementation skill per ticket that plans, builds, reviews and opens a draft PR through the ticket-pr workflow; eleven stage agents with narrow tool surfaces. Configured per project by the setup skill.",
+      "version": "2026.10.22",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/piyushsatti/ordinator.git"
+      },
+      "category": "Coding"
+    },
+    {
+      "name": "scriptorium",
+      "description": "Documentation and ticket production under a written house rulebook.",
+      "version": "2026.10.22",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/piyushsatti/scriptorium.git"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "manifold",
+      "description": "Establish global Manifold spaces through guided discovery and interviews; model needs, requirements, systems and change.",
+      "version": "2026.10.22",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/piyushsatti/manifold.git"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "agent-tmux",
+      "description": "Stdio MCP server that lets an agent see and lay out its own tmux session: list, capture, new windows and splits, wait for output, and type into panes it owns without pressing Enter",
+      "version": "2026.10.22",
+      "source": {
+        "source": "local",
+        "path": "./tools/agent-tmux"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

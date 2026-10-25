@@ -1,0 +1,123 @@
+#!/usr/bin/env -S python3 -I
+"""Print dream's per-machine settings, merged over the defaults, as JSON.
+
+Usage: dream-config [--space <path>] [--key <project key>] [--date YYYY-MM-DD] [--check]
+
+Reads ~/.local/state/dream/config.json (DREAM_CONFIG overrides the path). A
+missing file is not an error: the defaults are printed with "configured": false,
+and the skill then files only into memory. `~` is expanded, and `<space>`,
+`<key>` and `<date>` are filled in the two directory templates when given. `--check` also
+lists each configured path that does not exist, on stderr, and exits 1 if any.
+"""
+
+import datetime
+import json
+import os
+import sys
+from pathlib import Path
+
+DEFAULTS = {
+    "read_first": [],
+    "rulebooks_dir": "",
+    "locate_hint": "",
+    "routes": [],
+    "open_loop_tracker": "",
+    "trash_command": "trash-put",
+    "state_dir": "~/.local/state/dream/<key>/state",
+    "run_dir": "~/.local/state/dream/<key>/runs/<date>-dream",
+}
+TEMPLATES = ("state_dir", "run_dir")
+
+
+def config_path() -> Path:
+    """Where the settings live."""
+    override = os.environ.get("DREAM_CONFIG")
+    return Path(override) if override else Path.home() / ".local/state/dream/config.json"
+
+
+def _expand(value: str) -> str:
+    return os.path.expanduser(value) if value.startswith("~") else value
+
+
+def load(key: str = "", date: str = "", space: str = "") -> dict:
+    """Return the merged settings with paths expanded."""
+    path = config_path()
+    merged = dict(DEFAULTS)
+    merged["configured"] = path.exists()
+    merged["config_path"] = str(path)
+    if path.exists():
+        data = json.loads(path.read_text())
+        if not isinstance(data, dict):
+            raise ValueError(f"{path}: expected a JSON object")
+        unknown = sorted(set(data) - set(DEFAULTS) - {"$comment"})
+        if unknown:
+            raise ValueError(f"{path}: unknown keys {unknown}")
+        merged.update({k: v for k, v in data.items() if k != "$comment"})
+    for entry in merged["read_first"]:
+        entry["path"] = _expand(entry["path"])
+    for route in merged["routes"]:
+        route["to"] = _expand(route["to"])
+    merged["rulebooks_dir"] = _expand(merged["rulebooks_dir"])
+    for name in TEMPLATES:
+        value = _expand(merged[name])
+        if space:
+            value = value.replace("<space>", space.rstrip("/"))
+        if key:
+            value = value.replace("<key>", key)
+        if date:
+            value = value.replace("<date>", date)
+        merged[name] = value
+    return merged
+
+
+def missing(settings: dict) -> list[str]:
+    """Configured paths that do not exist; globs count if they match anything."""
+    paths = [e["path"] for e in settings["read_first"]]
+    paths += [r["to"] for r in settings["routes"]]
+    paths += [settings["rulebooks_dir"]] if settings["rulebooks_dir"] else []
+    gone = []
+    for path in paths:
+        if "*" in path:
+            parent = Path(path).parent
+            if not any(parent.glob(Path(path).name)):
+                gone.append(path)
+        elif not Path(path).exists():
+            gone.append(path)
+    return gone
+
+
+def main(argv: list[str]) -> int:
+    key = date = space = ""
+    check = False
+    args = list(argv)
+    while args:
+        flag = args.pop(0)
+        if flag == "--key" and args:
+            key = args.pop(0)
+        elif flag == "--space" and args:
+            space = args.pop(0)
+        elif flag == "--date" and args:
+            date = args.pop(0)
+        elif flag == "--check":
+            check = True
+        else:
+            print(__doc__, file=sys.stderr)
+            return 2
+    if key and not date:
+        date = datetime.date.today().isoformat()
+    try:
+        settings = load(key, date, space)
+    except (ValueError, KeyError, TypeError) as error:
+        print(f"dream-config: {error}", file=sys.stderr)
+        return 2
+    print(json.dumps(settings, indent=1))
+    if check:
+        gone = missing(settings)
+        for path in gone:
+            print(f"MISSING {path}", file=sys.stderr)
+        return 1 if gone else 0
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

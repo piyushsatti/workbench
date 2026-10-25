@@ -1,0 +1,7 @@
+catppuccin_mocha.theme is the official Catppuccin btop theme, copied byte for byte.
+Source:  https://github.com/catppuccin/btop/blob/f437574b600f1c6d932627050b15ff5153b58fa3/themes/catppuccin_mocha.theme
+Commit:  f437574b600f1c6d932627050b15ff5153b58fa3 (main, 2024-09-23)
+SHA-256: 4c7469ab9bda282c1ff606aca37c9c0b84cd0cb66d041e4e7e1fed39791f4644
+Licence: MIT, Copyright (c) 2021 Catppuccin; full text in .catppuccin-LICENSE.
+Dot-prefixed files here stay in the chezmoi source and are not applied.
+To update: change the pin, re-download, and refresh the SHA-256.

@@ -1,0 +1,10 @@
+{{- /* Linux installs require an explicit profile; macOS keeps its current empty fallback. */ -}}
+{{- $profile := dig "workstation" "profile" "" . -}}
+{{- if not $profile -}}{{- $profile = env "WORKSTATION_PROFILE" -}}{{- end -}}
+{{- if eq .chezmoi.os "darwin" -}}
+{{- $profile -}}
+{{- else if or (eq $profile "linux") (eq $profile "linux-full") -}}
+{{- $profile -}}
+{{- else -}}
+{{- fail (printf "workstation profile is not set: run chezmoi init and choose linux or linux-full, set [data.workstation] profile in ~/.config/chezmoi/chezmoi.toml, or export WORKSTATION_PROFILE=linux|linux-full (got %q)" $profile) -}}
+{{- end -}}

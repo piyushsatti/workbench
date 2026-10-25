@@ -1,0 +1,92 @@
+#!/usr/bin/env -S python3 -I
+"""Catalog every Claude memory store, for cross-project linking and decay.
+
+Usage: dream-catalog <projects dir> [recall.tsv ...]
+
+Prints one TSV row per memory file in every <projects dir>/*/memory store:
+store, tier (index or archive), file, type, created, last confirmed, last
+recalled, stale, description. "Last recalled" comes from the recall logs that
+dream-replay writes. A file is stale when its newest date of created, last
+confirmed and last recalled is more than STALE_DAYS old; stale files are
+candidates to move to the archive tier, never to delete.
+"""
+
+import datetime
+import re
+import sys
+from pathlib import Path
+
+STALE_DAYS = 60
+COLUMNS = (
+    "store",
+    "tier",
+    "file",
+    "type",
+    "created",
+    "confirmed",
+    "recalled",
+    "stale",
+    "description",
+)
+
+
+def _frontmatter(text: str) -> dict:
+    if not text.startswith("---\n"):
+        return {}
+    end = text.find("\n---", 4)
+    fields, section = {}, None
+    for line in text[4:end].splitlines():
+        top = re.match(r"^([A-Za-z_]+):\s*(.*)$", line)
+        nested = re.match(r"^\s+([A-Za-z_]+):\s*(.*)$", line)
+        if top:
+            section = top.group(1)
+            fields[section] = top.group(2).strip().strip("\"'")
+        elif nested and section:
+            fields.setdefault(nested.group(1), nested.group(2).strip().strip("\"'"))
+    return fields
+
+
+def _recalls(logs: list[str]) -> dict[tuple[str, str], str]:
+    latest: dict[tuple[str, str], str] = {}
+    for log in logs:
+        for row in Path(log).read_text().splitlines():
+            date, _, _, store, name = row.split("\t")
+            latest[store, name] = max(date, latest.get((store, name), ""))
+    return latest
+
+
+def main(projects: Path, logs: list[str]) -> int:
+    """Print the catalog."""
+    recalled = _recalls(logs)
+    today = datetime.datetime.now(datetime.UTC).date()
+    cutoff = (today - datetime.timedelta(days=STALE_DAYS)).isoformat()
+    print("\t".join(COLUMNS))
+    for memory in sorted(projects.glob("*/memory")):
+        store = memory.parent.name
+        tiers = [("index", p) for p in memory.glob("*.md") if p.name != "MEMORY.md"]
+        tiers += [("archive", p) for p in memory.glob("archive/*.md")]
+        for tier, path in sorted(tiers):
+            fields = _frontmatter(path.read_text(errors="replace"))
+            created = fields.get("created", "")
+            confirmed = fields.get("last_confirmed", "")
+            last = recalled.get((store, path.name), "")
+            stale = tier == "index" and max(created, confirmed, last) < cutoff
+            row = (
+                store,
+                tier,
+                path.name,
+                fields.get("type", ""),
+                created,
+                confirmed,
+                last,
+                "stale" if stale else "",
+                fields.get("description", "").replace("\t", " "),
+            )
+            print("\t".join(row))
+    return 0
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        sys.exit(__doc__)
+    sys.exit(main(Path(sys.argv[1]), sys.argv[2:]))

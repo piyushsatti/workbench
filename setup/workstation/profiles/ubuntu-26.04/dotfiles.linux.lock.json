@@ -1,0 +1,12 @@
+{
+  "profile": "linux",
+  "targets": [
+    ".bash_aliases",
+    ".bash_profile",
+    ".bashrc",
+    ".config/btop/btop.conf",
+    ".config/starship.toml",
+    ".tmux.conf"
+  ],
+  "rendered_sha256": "2aedc25af2c99966b06604560d6583b320f2d01c75210c801d83a9f13f9807aa"
+}

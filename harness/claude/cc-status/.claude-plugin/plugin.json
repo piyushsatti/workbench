@@ -1,0 +1,6 @@
+{
+  "name": "cc-status",
+  "version": "2026.10.05",
+  "description": "Prompt footer: turn number and compactions beside the permission mode, 5h and 7d limits at the right; the memory list under the logo; /mem and /diet",
+  "types": "./types/index.d.ts"
+}

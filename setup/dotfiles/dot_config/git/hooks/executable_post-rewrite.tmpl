@@ -1,0 +1,4 @@
+#!/bin/sh
+# Global post-rewrite hook, installed by chezmoi through core.hooksPath: it only hands over to the
+# repository's own post-rewrite hook, which core.hooksPath would otherwise skip (git-lfs, husky and the like).
+{{ template "git-hook-chain.sh" (dict "hook" "post-rewrite" "data" .) }}

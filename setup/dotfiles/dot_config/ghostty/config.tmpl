@@ -1,0 +1,35 @@
+{{- $themeName := includeTemplate "theme-name" . -}}
+# Ghostty configuration
+# Replaces alacritty. Theme and font match the rest of the stack (tmux, starship, btop, VS Code).
+
+# Theme from .chezmoidata/theme.yaml
+theme = {{ (index .themes $themeName).names.ghostty }}
+
+# The Mono variant keeps Nerd Font glyphs one cell wide, which the fixed-width tmux tabs rely on.
+font-family = JetBrainsMono Nerd Font Mono
+font-size = 12
+
+# Window
+window-padding-x = 8
+window-padding-y = 8
+window-save-state = always
+{{- if eq .chezmoi.os "darwin" }}
+macos-titlebar-style = tabs
+{{- end }}
+
+# Shell integration: ghostty detects the shell and injects features
+# (cursor shape, prompt marking, working-dir inheritance on split/new tab).
+shell-integration = detect
+shell-integration-features = cursor,sudo,title
+
+# Scrollback
+scrollback-limit = 10000
+
+# macOS: Option key sends Escape+ so readline/vi word-motions work.
+{{- if eq .chezmoi.os "darwin" }}
+macos-option-as-alt = true
+{{- end }}
+
+# Quality of life
+copy-on-select = clipboard
+confirm-close-surface = false

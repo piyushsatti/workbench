@@ -1,0 +1,12 @@
+{
+  "allow_launch": ["~/Source"],
+  "deny_launch": ["~/Source/private/*"],
+  "deny_access": ["~/.ssh", "~/.gnupg"],
+  "spaces": {
+    "example": {
+      "root": "~/Source/Projects/example-app",
+      "attach": ["~/Source/Projects/example-lib"],
+      "deny_access": []
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "files": [
+    {
+      "src": "git-guard.py",
+      "dest": "~/.local/bin/git-guard",
+      "mode": "0755"
+    }
+  ]
+}

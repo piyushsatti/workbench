@@ -1,0 +1,24 @@
+{
+  "files": [
+    {
+      "src": "bin/dream-replay",
+      "dest": "~/.local/bin/dream-replay",
+      "mode": "0755"
+    },
+    {
+      "src": "bin/dream-catalog",
+      "dest": "~/.local/bin/dream-catalog",
+      "mode": "0755"
+    },
+    {
+      "src": "bin/dream-lint-memory",
+      "dest": "~/.local/bin/dream-lint-memory",
+      "mode": "0755"
+    },
+    {
+      "src": "bin/dream-config",
+      "dest": "~/.local/bin/dream-config",
+      "mode": "0755"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+#!/bin/sh
+# Global pre-merge-commit hook, installed by chezmoi through core.hooksPath.
+# A merge that creates a commit skips pre-commit, so the same identity check runs here,
+# then the repository's own pre-merge-commit hook.
+{{ template "git-identity-check.sh" (dict "hook" "pre-merge-commit" "data" .) }}
+{{ template "git-hook-chain.sh" (dict "hook" "pre-merge-commit" "data" .) }}

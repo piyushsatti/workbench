@@ -1,0 +1,113 @@
+# Machine profiles and package lists. A profile is a list of modules.
+#
+# Format: a small YAML subset, so scripts/profile.py reads it with the Python standard
+# library alone (no YAML library ships offline). It is still plain YAML. Allowed:
+#   - `key: value` and `key:` followed by a block indented two spaces further
+#   - block lists (`- item`) and one-line flow lists (`[a, b]`) of plain words
+#   - `null`, integers, and `#` comments (whole line, or after a space)
+# Not allowed: quotes, anchors, multi-line strings, inline mappings, tabs, and values that
+# YAML would read as booleans (yes/no/on/off/true/false). profile.py rejects anything else.
+#
+# Apt packages are listed by name in <locks>/apt.txt and install at the version Ubuntu
+# offers. CLIs (chezmoi, uv and the agent harnesses) install only when missing; one already
+# installed is kept and updates itself. Pins remain only where nothing else updates or checks:
+# chezmoi and the font in <locks>/versions.json (checksummed), tmux plugin commits in
+# <locks>/plugins.json, and VS Code extensions in <locks>/extensions.json.
+#
+# Keys that drive installation: a profile's locks, dotfiles_lock and modules, and a module's
+# requires, apt, harnesses and claude_plugins. Labels only, which the installer parses but
+# never reads to install anything: os, each module's tools and external, and external_lock.
+
+schema: 1
+
+# Label only: the outside pin file the external entries below name (path relative to this file).
+external_lock: ../../external/sources.lock.yaml
+
+profiles:
+  # Packages and dotfiles on an Ubuntu 26.04 that is already installed. Nothing here installs the OS.
+  # Headless Linux: the basics, no GUI.
+  # Dotfiles: the shell, tmux, btop and starship targets in their own lock; no terminal or editor settings.
+  linux:
+    os: ubuntu-26.04
+    locks: profiles/ubuntu-26.04
+    dotfiles_lock: profiles/ubuntu-26.04/dotfiles.linux.lock.json
+    modules: [base, shell, tmux, editors, dev, containers, agents]
+
+  # Linux GUI: the basics plus Ghostty, VS Code, Nerd Font and Wayland clipboard.
+  # Its expansion must equal profiles/ubuntu-26.04/apt.txt exactly; tests/test_profile.py checks it.
+  linux-full:
+    os: ubuntu-26.04
+    locks: profiles/ubuntu-26.04
+    dotfiles_lock: profiles/ubuntu-26.04/dotfiles.lock.json
+    modules: [base, shell, tmux, editors, dev, containers, agents, gui]
+
+  # macOS. chezmoi detects darwin itself; there is no package installer for it yet.
+  darwin:
+    os: darwin
+    locks: null
+    dotfiles_lock: null
+    modules: [base, shell, tmux, editors, dev, agents, gui, agents-gui]
+
+modules:
+  # Core system tools every machine needs, plus chezmoi.
+  base:
+    apt: [bash, ca-certificates, curl, git, gnupg, sudo, tar, unzip, wget, openssh-client, locales, jq, tree]
+    tools: [chezmoi]
+
+  # Interactive shell: completion, Starship prompt, modern CLI replacements and the
+  # shell dotfiles (bash, Starship, btop), plus the fd and bat command wrappers.
+  shell:
+    apt: [bash-completion, starship, btop, eza, fd-find, fzf, ripgrep, zoxide, bat, lazygit, ncurses-term]
+    tools: [dotfiles, fd-bat-wrappers]
+
+  # tmux and its plugins pinned in <locks>/plugins.json. tmux-thumbs is compiled with cargo.
+  tmux:
+    requires: [dev]
+    apt: [tmux]
+    tools: [tmux-plugins]
+
+  # Terminal editor. VS Code is a GUI application and lives in the gui module.
+  editors:
+    apt: [neovim]
+
+  # Development runtimes and build toolchains: C, Python, Node, Rust, Java, CMake, uv, gh.
+  # python3-yaml is in apt.txt but nothing in this installer imports it.
+  dev:
+    apt: [build-essential, python3, python3-venv, python3-yaml, nodejs, npm, cargo, rustc, pkg-config, libssl-dev, pipx, cmake, ninja-build, default-jdk, maven, gh]
+    tools: [uv]
+
+  # Docker Engine with Compose and Buildx; bootstrap adds the user to the docker group.
+  containers:
+    apt: [docker.io, docker-buildx, docker-compose-v2]
+    tools: [docker-group]
+
+  # Agent harnesses: the latest from npm when missing, kept when installed; plus the
+  # seeded Claude and OpenCode settings. external names acpx (agent_tools.acpx in
+  # external/sources.lock.yaml) as a label only: nothing here installs acpx.
+  # claude_plugins: installed for the user when missing; one already installed is left
+  # as is, enabled or disabled.
+  agents:
+    requires: [dev]
+    harnesses: [claude, codex, opencode]
+    external: [agent_tools.acpx]
+    claude_plugins:
+      - claude-code-setup@claude-plugins-official
+      - discord@claude-plugins-official
+      - frontend-design@claude-plugins-official
+      - pyright-lsp@claude-plugins-official
+      - security-guidance@claude-plugins-official
+      - skill-creator@claude-plugins-official
+      - typescript-lsp@claude-plugins-official
+      - vercel@claude-plugins-official
+
+  # Cursor, a GUI harness. macOS only for now: .chezmoiignore.tmpl skips its settings on
+  # Linux. No pinned source yet.
+  agents-gui:
+    requires: [gui]
+    harnesses: [cursor]
+
+  # Graphical applications: Ghostty, VS Code (from the Microsoft apt repository) with
+  # the extensions in <locks>/extensions.json, the Nerd Font, and the Wayland clipboard.
+  gui:
+    apt: [ghostty, code, fontconfig, wl-clipboard, xdg-utils, python3-json5]
+    tools: [nerd-font, vscode-extensions]

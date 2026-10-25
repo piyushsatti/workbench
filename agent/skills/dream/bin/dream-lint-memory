@@ -1,0 +1,132 @@
+#!/usr/bin/env -S python3 -I
+"""Lint a Claude memory store: frontmatter, filenames, index, links and secrets.
+
+Usage: dream-lint-memory <memory dir>
+Prints ERROR and WARN lines and exits 1 if any ERROR was found.
+"""
+
+import re
+import sys
+from pathlib import Path
+
+TYPES = {"user", "feedback", "project", "reference"}
+REQUIRED = ("name", "description", "type")
+RULEBOOK_FIELDS = ("created", "last_updated", "scope", "genericity", "schema_version")
+FILENAME = re.compile(
+    r"^\d{4}-\d{2}-\d{2}-(user|feedback|project|reference)_[a-z0-9-]+\.md$"
+)
+LINK = re.compile(r"\[\[([^\]]+)\]\]")
+INDEX_LINE = re.compile(r"^- \[[^\]]+\]\(([^)]+)\) — .+")
+SECRETS = (
+    re.compile(
+        r"(password|passwd|secret|token|api[_-]?key)\s*[:=]\s*\S{6,}", re.IGNORECASE
+    ),
+    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
+    re.compile(r"\w+://[^/\s:@]+:[^@\s]+@"),
+)
+MAX_INDEX_LINE = 200
+MAX_INDEX_LINES = 200
+
+
+def frontmatter(text):
+    """Return top-level keys, plus metadata.type as 'metadata.type'."""
+    if not text.startswith("---\n"):
+        return None
+    end = text.find("\n---", 4)
+    if end == -1:
+        return None
+    fields, section = {}, None
+    for line in text[4:end].splitlines():
+        top = re.match(r"^([A-Za-z_]+):\s*(.*)$", line)
+        nested = re.match(r"^\s+([A-Za-z_]+):\s*(.*)$", line)
+        if top:
+            section = top.group(1)
+            fields[section] = top.group(2).strip().strip("\"'")
+        elif nested and section:
+            fields[f"{section}.{nested.group(1)}"] = nested.group(2).strip()
+    return fields
+
+
+def main(directory):
+    root = Path(directory)
+    errors, warns = [], []
+    files = sorted(p for p in root.glob("*.md") if p.name != "MEMORY.md")
+    # The archive tier is searched, not loaded, so it is linted but never indexed.
+    archived = sorted((root / "archive").glob("*.md"))
+    names = {}
+    for path in files + archived:
+        fields = frontmatter(path.read_text())
+        if fields is None:
+            errors.append(f"{path.name}: no frontmatter")
+            continue
+        names[fields.get("name", "")] = path
+        for key in REQUIRED:
+            if key == "type" and "metadata.type" in fields:
+                continue
+            if not fields.get(key):
+                errors.append(f"{path.name}: missing {key}")
+        kind = fields.get("type") or fields.get("metadata.type")
+        if kind not in TYPES:
+            errors.append(f"{path.name}: type {kind!r} is not one of {sorted(TYPES)}")
+        for key in RULEBOOK_FIELDS:
+            # The harness moves these under metadata: when it saves a memory.
+            if key not in fields and f"metadata.{key}" not in fields:
+                warns.append(f"{path.name}: missing rulebook field {key}")
+        if not FILENAME.match(path.name):
+            warns.append(f"{path.name}: filename is not <created>-<type>_<slug>.md")
+        body = path.read_text()
+        if kind in {"feedback", "project"}:
+            for marker in ("**Why:**", "**How to apply:**"):
+                if marker not in body:
+                    warns.append(f"{path.name}: no {marker}")
+        for pattern in SECRETS:
+            if pattern.search(body):
+                errors.append(
+                    f"{path.name}: looks like a secret ({pattern.pattern[:30]}...)"
+                )
+
+    stems = {p.stem for p in files + archived}
+    for path in files + archived:
+        for link in LINK.findall(path.read_text()):
+            if link not in names and link not in stems:
+                errors.append(f"{path.name}: [[{link}]] matches no memory name or file")
+
+    index = root / "MEMORY.md"
+    indexed = set()
+    lines = index.read_text().splitlines() if index.exists() else []
+    if not index.exists():
+        errors.append("MEMORY.md missing")
+    for number, line in enumerate(lines, 1):
+        if not line.strip():
+            continue
+        match = INDEX_LINE.match(line)
+        if not match:
+            warns.append(f"MEMORY.md:{number}: not '- [Title](file.md) — hook'")
+            continue
+        target = match.group(1)
+        indexed.add(target)
+        if not (root / target).exists():
+            errors.append(f"MEMORY.md:{number}: points at missing {target}")
+        if len(line) > MAX_INDEX_LINE:
+            warns.append(
+                f"MEMORY.md:{number}: {len(line)} chars, over {MAX_INDEX_LINE}"
+            )
+    if len(lines) > MAX_INDEX_LINES:
+        warns.append(f"MEMORY.md: {len(lines)} lines, over {MAX_INDEX_LINES}")
+    for path in files:
+        if path.name not in indexed:
+            errors.append(f"{path.name}: not in MEMORY.md")
+
+    for line in errors:
+        print(f"ERROR {line}")
+    for line in warns:
+        print(f"WARN  {line}")
+    print(
+        f"{len(files)} indexed + {len(archived)} archived files, "
+        f"{len(errors)} errors, {len(warns)} warnings"
+    )
+    return 1 if errors else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1]))

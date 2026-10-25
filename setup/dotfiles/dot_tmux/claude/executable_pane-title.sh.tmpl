@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+{{ $themeName := includeTemplate "theme-name" . -}}
+{{ $t := index .themes $themeName -}}
+# pane-title.sh <path>: the folder and branch for a tmux pane's top border, the way the Claude status line drew them.
+# Folder fish-style (last two components whole, the rest cut to one char, dot-dirs to two); branch with " " in a
+# main checkout, " wt:" in a linked worktree. Prints tmux style codes, colours from the tmux theme.
+# Used by pane-border-format in tmux-status.conf. Lives in ~/.tmux/claude/ for the same reason as that file.
+cwd=${1:-}
+[ -n "$cwd" ] || exit 0
+home=$HOME
+if [ "$cwd" = "$home" ]; then shown="~"
+elif [ "${cwd#"$home/"}" != "$cwd" ]; then shown="~/${cwd#"$home/"}"
+else shown=$cwd; fi
+
+folder=$shown
+if [ "$shown" != "~" ] && [ "$shown" != "/" ]; then
+  if [ "${shown#\~/}" != "$shown" ]; then anchor="~/"; rel=${shown#\~/}; else anchor="/"; rel=${shown#/}; fi
+  IFS='/' read -r -a parts <<< "$rel"
+  n=${#parts[@]}
+  out=""
+  for ((i = 0; i < n; i++)); do
+    p=${parts[i]}
+    if [ "$i" -ge $((n - 2)) ] || [ -z "$p" ]; then seg=$p
+    elif [ "${p#.}" != "$p" ]; then seg=${p:0:2}
+    else seg=${p:0:1}; fi
+    out=${out:+$out/}$seg
+  done
+  folder=$anchor$out
+fi
+
+# tmux expands this output once more, so a # in a folder or branch name is doubled to show as itself.
+line="#[fg={{ $t.accent }},bold]${folder//\#/##}#[nobold]"
+info=$(git -C "$cwd" --no-optional-locks rev-parse --abbrev-ref HEAD --git-dir --git-common-dir 2>/dev/null)
+if [ -n "$info" ]; then
+  { read -r branch; read -r gitdir; read -r commondir; } <<< "$info"
+  prefix=" "
+  [ "$gitdir" != "$commondir" ] && prefix=" wt:"
+  line="$line  #[fg={{ $t.blue }}]${prefix}${branch//\#/##}"
+fi
+printf ' %s #[default]' "$line"

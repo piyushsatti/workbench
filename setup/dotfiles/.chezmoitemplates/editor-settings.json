@@ -1,0 +1,76 @@
+{{- /* Shared VS Code / Cursor user settings. Called with (dict "editor" "code"|"cursor" "theme" <palette> "os" <os>). */ -}}
+{{- $cursor := eq .editor "cursor" -}}
+{
+  "workbench.colorTheme": {{ .theme.names.vscode | toJson }},
+  "workbench.preferredDarkColorTheme": {{ .theme.names.vscode | toJson }},
+  "workbench.iconTheme": {{ .theme.names.vscode_icons | toJson }},
+  "window.autoDetectColorScheme": false,
+  "editor.fontFamily": "'JetBrainsMono Nerd Font', 'Droid Sans Mono', monospace",
+  "editor.fontLigatures": true,
+  "editor.formatOnSave": true,
+  "editor.bracketPairColorization.independentColorPoolPerBracketType": true,
+  "files.autoSave": "onFocusChange",
+  "terminal.integrated.fontFamily": "'JetBrainsMono Nerd Font'",
+  "terminal.integrated.shellIntegration.enabled": true,
+  "terminal.integrated.initialHint": false,
+  "terminal.integrated.enableMultiLinePasteWarning": "never",
+{{- if eq .os "darwin" }}
+  "terminal.integrated.macOptionIsMeta": true,
+{{- else }}
+  "terminal.integrated.profiles.linux": {
+    "bash": {
+      "path": "/bin/bash",
+      "args": ["-l"]
+    }
+  },
+  "terminal.integrated.defaultProfile.linux": "bash",
+{{- end }}
+{{- if not $cursor }}
+  "chat.agent.enabled": false,
+  "chat.defaultProvider": "claude-code",
+  "chat.sendElementsToChat.enabled": false,
+  "chat.disableAIFeatures": true,
+  "github.copilot.enable": {
+    "*": false,
+    "plaintext": false,
+    "markdown": false,
+    "scminput": false
+  },
+  "github.copilot.chat.enabled": false,
+  "workbench.commandPalette.showAskInChat": false,
+{{- else }}
+  "cursor.composer.shouldChimeAfterChatFinishes": true,
+  "cursor.general.glassShowWarningNotifications": true,
+  "cursor.composer.conversationDensity": "compact-ungrouped",
+{{- end }}
+  "claudeCode.selectedModel": "sonnet",
+  "claudeCode.hideOnboarding": true,
+  "claudeCode.preferredLocation": "sidebar",
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  },
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.terminal.activateEnvironment": false,
+  "python.analysis.typeCheckingMode": "standard",
+  "git.autofetch": true,
+  "git.showStatusBarSync": false,
+  "git.rebaseWhenSync": false,
+  "git.pullRebase": false,
+  "scm.repositories.selectionMode": "single",
+  "gitlens.ai.model": "gitkraken",
+  "gitlens.ai.gitkraken.model": "gemini:gemini-2.5-flash",
+  "gitlens.graph.minimap.enabled": false,
+  "gitlens.views.commitDetails.files.compact": true,
+  "gitlens.views.commitDetails.files.icon": "type",
+  "gitlens.views.commitDetails.files.layout": "tree",
+  "gitlens.views.commitDetails.files.threshold": 5,
+  "makefile.configureOnOpen": true,
+  "security.workspace.trust.untrustedFiles": "open",
+  "explorer.confirmPasteNative": false,
+  "explorer.confirmDragAndDrop": false,
+  "workbench.secondarySideBar.defaultVisibility": "hidden",
+  "workbench.activityBar.location": "top",
+  "remote.autoForwardPortsSource": "hybrid",
+  "extensions.autoUpdate": false,
+  "extensions.autoCheckUpdates": false
+}
