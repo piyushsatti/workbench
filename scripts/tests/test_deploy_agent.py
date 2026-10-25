@@ -1,5 +1,6 @@
 """deploy_agent.py: dry run writes nothing, apply copies and backs up, CLAUDE.md and a hand-made
-~/.codex/AGENTS.md are never written, and subagents convert for Codex and Cursor."""
+~/.codex/AGENTS.md or ~/.config/opencode/AGENTS.md are never written, and subagents convert for Codex,
+Cursor and OpenCode."""
 
 import importlib.util
 import tempfile
@@ -109,7 +110,12 @@ class DeployAgentTests(unittest.TestCase):
             self.assertIn("User Rules", cursor)
             self.assertNotIn(".codex/", cursor)
             default = self.run_main(home)
-            for path in (".claude/agents/architect.md", ".codex/agents/architect.toml", ".cursor/agents/architect.md"):
+            opencode = self.run_main(home, "--harness", "opencode")
+            self.assertIn(".config/opencode/agents/architect.md", opencode)
+            self.assertIn(".config/opencode/AGENTS.md", opencode)
+            self.assertNotIn(".codex/", opencode)
+            for path in (".claude/agents/architect.md", ".codex/agents/architect.toml", ".cursor/agents/architect.md",
+                         ".config/opencode/agents/architect.md"):
                 self.assertIn(path, default)
             with self.assertRaises(SystemExit), mock.patch("sys.stderr", StringIO()):
                 self.run_main(home, "--harness", "pi")
@@ -142,6 +148,32 @@ class DeployAgentTests(unittest.TestCase):
         self.assertEqual(body, MODULE.frontmatter(text)[1])
         scrutineer = MODULE.to_cursor("s.md", (MODULE.AGENT / "subagents/scrutineer.md").read_text())
         self.assertIn("readonly: false", scrutineer)
+
+    def test_opencode_agents_get_opencode_frontmatter(self):
+        text = (MODULE.AGENT / "subagents/architect.md").read_text()
+        converted = MODULE.to_opencode("subagents/architect.md", text)
+        fields, body = MODULE.frontmatter(converted)
+        self.assertEqual(fields["mode"], "subagent")
+        self.assertEqual(fields["description"], MODULE.frontmatter(text)[0]["description"])
+        self.assertNotIn("model", fields)
+        self.assertNotIn("name", fields)
+        self.assertIn("permission:\n  edit: deny\n---", converted)
+        self.assertEqual(body, MODULE.frontmatter(text)[1])
+        no_shell = MODULE.to_opencode("x.md", "---\nname: x\ndescription: d\ntools: Read\n---\nBody\n")
+        self.assertIn("permission:\n  edit: deny\n  bash: deny\n---", no_shell)
+        unrestricted = MODULE.to_opencode("x.md", "---\nname: x\ndescription: d\n---\nBody\n")
+        self.assertNotIn("permission", unrestricted)
+
+    def test_opencode_rules_follow_the_codex_rules(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            self.run_main(home, "--harness", "opencode", "--apply")
+            rules = home / ".config/opencode/AGENTS.md"
+            self.assertEqual(rules.read_text(), (MODULE.AGENT / "AGENTS.md").read_text())
+            self.assertIn("up to date", self.run_main(home, "--harness", "opencode"))
+            rules.write_text("my own rules\n")
+            self.assertIn("OpenCode reads its literal text", self.run_main(home, "--harness", "opencode", "--apply"))
+            self.assertEqual(rules.read_text(), "my own rules\n")
 
     def test_codex_agents_md_is_copied_when_missing_and_never_overwritten(self):
         with tempfile.TemporaryDirectory() as temp:

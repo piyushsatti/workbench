@@ -35,7 +35,7 @@ What is decided now. When a decision changes, edit it here in place; git is the 
 
 ## What each piece is
 
-- **observational-memory**: plain hooks, works in all three harnesses, on from install in `both` mode.
+- **observational-memory**: plain hooks (a plugin module in OpenCode), works in all four harnesses, on from install in `both` mode.
 - **rpctool** (`rpctool@pi`): runs tool calls, including remote execution.
 - **ordinator**: owns orchestration-shaped work, including pm and tm as internals (in ordinator's `internal/`). Review capabilities stay with the crucible skill.
 - **agent-coop**: human↔harness coordination (a shared document-review surface), separate from ordinator and from `workspaces`, which only gates where a harness may launch.

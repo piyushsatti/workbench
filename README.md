@@ -34,7 +34,7 @@ chezmoi apply
 ~/Source/workbench/tools/cli/bin/workbench deploy --apply
 ```
 
-This copies the rulebooks and skills to where Claude Code, Codex, Cursor and OpenCode look for them, and installs git-guard, snippets, the skills' helper scripts and the `workbench` command itself in `~/.local/bin`. From then on it's just `workbench setup`, `workbench dotfiles diff|apply`, `workbench deploy` and `workbench plugins`. It prints the build commands for the Go tools (workspaces, agent-tmux) rather than running them. Add `--harness claude` (or `codex`, `cursor`) to limit it to one harness.
+This copies the rulebooks and skills to where Claude Code, Codex, Cursor and OpenCode look for them, and installs git-guard, snippets, the skills' helper scripts and the `workbench` command itself in `~/.local/bin`. From then on it's just `workbench setup`, `workbench dotfiles diff|apply`, `workbench deploy` and `workbench plugins`. It prints the build commands for the Go tools (workspaces, agent-tmux) rather than running them. Add `--harness claude` (or `codex`, `cursor`, `opencode`) to limit it to one harness.
 
 ### Plugins from the `pi` marketplace
 

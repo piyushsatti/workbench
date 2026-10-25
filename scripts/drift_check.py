@@ -100,7 +100,7 @@ def main(argv=None):
     parser.add_argument("--verbose", action="store_true", help="list every finding, not just the first five per check")
     deploy = load("deploy_agent")
     parser.add_argument("--harness", type=deploy.parse_harnesses, default=deploy.HARNESSES,
-                        help="comma-separated harnesses whose deploy targets count (default: claude,codex,cursor)")
+                        help="comma-separated harnesses whose deploy targets count (default: claude,codex,cursor,opencode)")
     args = parser.parse_args(argv)
     bad = 0
     for label, check in CHECKS:

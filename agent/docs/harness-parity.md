@@ -1,6 +1,6 @@
-# Harness parity: Claude Code, Codex, Cursor
+# Harness parity: Claude Code, Codex, Cursor, OpenCode
 
-What each of the three supported harnesses reads, and where `scripts/deploy_agent.py` puts the shared config for it. Pi Agent and OpenCode are out of scope: Pi Agent is not supported and OpenCode is diagnose-only.
+What each of the four supported harnesses reads, and where `scripts/deploy_agent.py` puts the shared config for it. The tables below cover Claude Code, Codex and Cursor; OpenCode has [its own section](#opencode). Pi Agent is not supported.
 
 Every cell carries one mark:
 
@@ -85,7 +85,18 @@ The Claude profiles in `agent/sandbox/` have no Codex or Cursor equivalent yet. 
 | Mechanism | `statusLine` command, session JSON on stdin ([doc][cc-statusline]) | `[tui] status_line`: an ordered list of built-in item identifiers, `null` disables it; no command form ([doc][cx-config]). Command items were rejected upstream (issue #17827, from the 2026-08-22 version of this page, not rechecked) | CLI only: `statusLine` with `type: "command"` in `~/.cursor/cli-config.json`, JSON on stdin, "aligned with Claude Code's status line" (obs: Cursor's bundled `~/.cursor/skills-cursor/statusline/SKILL.md`; the official configuration page lists only display toggles ([doc][cu-cliconfig])). A custom line replaces both native footer rows ([forum][cu-forum-statusline]) |
 | What deploy does | nothing | nothing | nothing |
 
-## Sources
+## OpenCode
+
+OpenCode 2 (2.1.4 observed). Its docs pages were fetched on 2026-10-25 and still mark some behaviour as OpenCode 1 only.
+
+| | OpenCode | What deploy does |
+|---|---|---|
+| Global rules | `~/.config/opencode/AGENTS.md`; if it is missing, `~/.claude/CLAUDE.md` is read instead ([doc][oc-rules]). `instructions` in the config adds files by absolute path, glob or URL ([doc][oc-config]) | copies `agent/AGENTS.md` to `~/.config/opencode/AGENTS.md` under the same rule as Codex: written when missing or an earlier deploy's copy, otherwise a CHECK line |
+| Skills | `~/.config/opencode/skills/`, `~/.claude/skills/`, `~/.agents/skills/` and their project forms ([doc][oc-skills]) | nothing more: it reads `~/.agents/skills`. It also reads `~/.claude/skills`, so each workbench skill may be found twice, as in Cursor (inf for how it resolves the duplicate) |
+| Subagents | Markdown in `~/.config/opencode/agents/`, the file name is the agent's name; frontmatter `description` (required), `mode: subagent`, `permission`, `model` (omitted: the calling agent's model) ([doc][oc-agents]) | converts: `description`, `mode: subagent`, `model` dropped, `permission: edit: deny` when the `tools` list has no file-writing tool and `bash: deny` when it has no Bash; body unchanged |
+| Plugins | JavaScript modules in `~/.config/opencode/plugins/`, loaded on their own ([doc][oc-config]) | plugin repos' `install.json` puts them there (observational-memory) |
+| Hooks, MCP, sandbox, statusline | plugins instead of hooks; `mcp` in `opencode.json[c]`; `permission` in the config | nothing |
+
 
 The link definitions below hold the URLs the tables cite (read the raw file to see them).
 
@@ -114,6 +125,10 @@ The link definitions below hold the URLs the tables cite (read the raw file to s
 [cu-cliconfig]: https://cursor.com/docs/cli/reference/configuration
 [cu-forum-claudemd]: https://forum.cursor.com/t/cursor-loads-claude-md-even-when-the-third-party-rules-toggle-is-turned-off/149974
 [cu-forum-optout]: https://forum.cursor.com/t/no-way-to-opt-out-of-third-party-claude-code-codex-config-loading-the-flag-is-hardcoded/166558
+[oc-rules]: https://opencode.ai/docs/rules/
+[oc-skills]: https://opencode.ai/docs/skills/
+[oc-agents]: https://opencode.ai/docs/agents/
+[oc-config]: https://opencode.ai/docs/config/
 [cu-forum-statusline]: https://forum.cursor.com/t/cursor-cli-custom-statusline-replaces-native-footer-and-cannot-preserve-auto-review-state/166364
 
 Not fetched this pass, linked from memory of the page names: `cc-subagents`, `cc-hooks`, `cc-mcp`, `cc-sandbox`, `cc-settings`, `cc-statusline` (Cursor's bundled skill links `cc-statusline` itself), `cu-sandbox` and `cu-perms` (seen in search results only). The `cx-config` link is the rendered form of the `config-reference.md` page that was fetched.

@@ -10,17 +10,20 @@ runtime/ or install.json; a skill's install.json places its executables like a p
 Plugin executables listed in each plugin repo's install.json are copied the same way (`files`); a `build`
 entry is printed for the user to run, never run here.
 
-`--harness claude,codex,cursor` (default: all three) picks the harness destinations. The shared
+`--harness claude,codex,cursor,opencode` (default: all four) picks the harness destinations. The shared
 ~/.agents files and plugin executables deploy whatever the filter says.
 - Claude Code: subagents copied as they are to ~/.claude/agents.
 - Codex: subagents converted to TOML in ~/.codex/agents; agent/AGENTS.md copied to ~/.codex/AGENTS.md,
   because Codex reads that file's literal text and follows no imports or pointers.
 - Cursor: subagents converted to Cursor frontmatter in ~/.cursor/agents. User Rules live in Cursor's
   settings, not a file, so they are only reported.
+- OpenCode: subagents converted to OpenCode frontmatter in ~/.config/opencode/agents; agent/AGENTS.md
+  copied to ~/.config/opencode/AGENTS.md, its global rules file. Skills need nothing more: it reads
+  ~/.agents/skills.
 See agent/docs/harness-parity.md for the sources.
 
 Never written, only checked: ~/.claude/CLAUDE.md (its format is the user's; it must import the canonical rules),
-a ~/.codex/AGENTS.md with its own content, and every settings file (hooks, permissions and sandbox
+a ~/.codex/AGENTS.md or ~/.config/opencode/AGENTS.md with its own content, and every settings file (hooks, permissions and sandbox
 profiles are merged by hand per repository).
 """
 
@@ -44,7 +47,7 @@ TOOLS = ROOT / "tools"
 # Harness extensions (harness/claude, …) live here, not under tools/.
 HARNESS_MODS = ROOT / "harness"
 HOME = Path.home()
-HARNESSES = ("claude", "codex", "cursor")
+HARNESSES = ("claude", "codex", "cursor", "opencode")
 
 # source (relative to agent/) -> destination (relative to $HOME); directories copy file by file.
 # Shared: every harness reads these, so they deploy regardless of --harness.
@@ -129,12 +132,34 @@ def to_cursor(src, text):
     return "\n".join(head) + body
 
 
+def to_opencode(src, text):
+    """Claude subagent -> OpenCode agent markdown (description, mode, permission).
+
+    The file name is the agent's name. `model` is dropped, so the subagent uses the model of the agent
+    that called it. A Claude tools list without a file-writing tool denies `edit`, and one without Bash
+    denies `bash`. The body is unchanged.
+    """
+    fields, body = frontmatter(text)
+    tools = tools_of(fields)
+    head = ["---", f"# {GENERATED.format(src=src)}",
+            f"description: {json.dumps(fields.get('description', ''), ensure_ascii=False)}",
+            "mode: subagent"]
+    if tools is not None:
+        denied = [k for k, absent in (("edit", not tools & WRITE_TOOLS), ("bash", "Bash" not in tools)) if absent]
+        if denied:
+            head += ["permission:"] + [f"  {k}: deny" for k in denied]
+    return "\n".join(head + ["---", ""]) + body
+
+
 # harness -> [(source, destination, converter, destination suffix)]; converter None copies as is
 HARNESS_TARGETS = {
     "claude": [("subagents", ".claude/agents", None, None), ("skills", ".claude/skills", None, None)],
     "codex": [("subagents", ".codex/agents", to_codex, ".toml")],
     "cursor": [("subagents", ".cursor/agents", to_cursor, ".md")],
+    "opencode": [("subagents", ".config/opencode/agents", to_opencode, ".md")],
 }
+# Harnesses that read agent/AGENTS.md only as a literal copy in their own folder (no imports).
+RULES_COPIES = {"codex": ".codex/AGENTS.md", "opencode": ".config/opencode/AGENTS.md"}
 
 
 def state_of(path, target, text=None):
@@ -196,13 +221,14 @@ def mapped(src, dst, convert, suffix):
         yield path, target, convert
 
 
-def codex_agents_md():
-    """Plan entry for ~/.codex/AGENTS.md, or None with a CHECK line when the file has its own content.
+def rules_copy(harness):
+    """Plan entry for the harness's copy of agent/AGENTS.md (RULES_COPIES), or None with a CHECK line
+    when the file has its own content.
 
     The file is ours to update when it is missing, already equal to agent/AGENTS.md, or equal to the
     deployed ~/.agents/AGENTS.md (an earlier deploy's copy). Anything else is the user's.
     """
-    src, dst = AGENT / "AGENTS.md", HOME / ".codex/AGENTS.md"
+    src, dst = AGENT / "AGENTS.md", HOME / RULES_COPIES[harness]
     if not dst.exists():
         return (src, dst, "new", None, None), None
     deployed = HOME / ".agents/AGENTS.md"
@@ -210,7 +236,8 @@ def codex_agents_md():
         return (src, dst, "same", None, None), None
     if not dst.is_symlink() and deployed.is_file() and filecmp.cmp(deployed, dst, shallow=False):
         return (src, dst, "changed", None, None), None
-    return None, (f"CHECK   {dst} has its own content, left as is. Codex reads its literal text and "
+    name = {"codex": "Codex", "opencode": "OpenCode"}[harness]
+    return None, (f"CHECK   {dst} has its own content, left as is. {name} reads its literal text and "
                   f"follows no pointer, so replace it by hand with a copy of agent/AGENTS.md")
 
 
@@ -221,10 +248,11 @@ def plan(harnesses=HARNESSES):
         for path, dst, convert in mapped(*target):
             text = convert(path.relative_to(AGENT), path.read_text()) if convert else None
             items.append((path, dst, state_of(path, dst, text), None, text))
-    if "codex" in harnesses:
-        entry, _ = codex_agents_md()
-        if entry:
-            items.append(entry)
+    for harness in RULES_COPIES:
+        if harness in harnesses:
+            entry, _ = rules_copy(harness)
+            if entry:
+                items.append(entry)
     for path, dst, mode in plugin_installs()[0]:
         items.append((path, dst, state_of(path, dst), mode, None))
     return items
@@ -249,10 +277,11 @@ def checks(harnesses=HARNESSES):
             yield f"MISSING {claude_md}: create it with the line {SHIM}"
         elif SHIM not in claude_md.read_text():
             yield f"CHECK   {claude_md} does not import {SHIM}"
-    if "codex" in harnesses:
-        _, line = codex_agents_md()
-        if line:
-            yield line
+    for harness in RULES_COPIES:
+        if harness in harnesses:
+            _, line = rules_copy(harness)
+            if line:
+                yield line
     if "cursor" in harnesses:
         yield ("CHECK   Cursor User Rules live in Cursor Settings > Rules, not a file: "
                "paste agent/AGENTS.md there by hand (not checked here)")
@@ -270,10 +299,10 @@ def main():
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--apply", action="store_true", help="copy the new and changed files")
     parser.add_argument("--harness", type=parse_harnesses, default=HARNESSES,
-                        help="comma-separated harnesses to deploy for (default: claude,codex,cursor)")
+                        help="comma-separated harnesses to deploy for (default: claude,codex,cursor,opencode)")
     args = parser.parse_args()
 
-    # Plan and checks are read before anything is written: the ~/.codex/AGENTS.md decision compares
+    # Plan and checks are read before anything is written: the rules-copy decisions compare
     # against the ~/.agents/AGENTS.md that is on disk now.
     items, notes, found = plan(args.harness), list(checks(args.harness)), list(extras(args.harness))
     changes = 0
