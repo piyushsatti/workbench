@@ -5,7 +5,7 @@ What is decided now. When a decision changes, edit it here in place; git is the 
 ## Repos and layout
 
 - `~/Source/workbench` holds machine setup, shared agent config, the repo's own tools and the `@pi` marketplace catalog. `PI_ROOT` defaults to it.
-- A separate repo is only for something another person could install. Six are plugins in the `pi` marketplace, each a sibling in `~/Source`: observational-memory, rpctool, agent-coop, ordinator, scriptorium and manifold. A seventh, agent-tmux, is a `pi` plugin too but stays in `tools/agent-tmux` (its `plugins.json` entry has a `path`, and the catalogs point at that folder). No nested repos, submodules or gitlinks in workbench.
+- A separate repo is only for something another person could install. Four are plugins in the `pi` marketplace, each a sibling in `~/Source`: observational-memory, rpctool, agent-coop and ordinator. A fifth, agent-tmux, is a `pi` plugin too but stays in `tools/agent-tmux` (its `plugins.json` entry has a `path`, and the catalogs point at that folder). No nested repos, submodules or gitlinks in workbench.
 - Folders are lowercase.
 
 | Folder | Holds |
@@ -73,9 +73,8 @@ What is decided now. When a decision changes, edit it here in place; git is the 
 
 ## Open
 
-- A licence for scriptorium. Its repo has none, which blocks `claude plugin validate`.
 - LSP plugins: decided off globally, but `claude_plugins` in `defaults.yml` installs pyright-lsp and typescript-lsp, which install enabled. Drop them from the list or change the rule.
-- Plugin data roots: agent-coop and scriptorium keep per-project state in `<project>/.local-state/<name>/`, while the rule is `~/.local/state/<plugin>/`. Pick one.
+- Plugin data roots: agent-coop keeps per-project state in `<project>/.local-state/<name>/`, while the rule is `~/.local/state/<plugin>/`. Pick one.
 - Crucible's plan-review hook (`crucible-plan-review-nudge`): dropped with the plugin; bring it back as a reviewed hook if wanted.
 - The permissive sandbox's structural fix: keep git inside the sandbox instead of excluding `git *`.
 - A pinned tmux-resurrect fork. Until then `run_after_20-patch-tmux-resurrect.sh` re-applies the patch.

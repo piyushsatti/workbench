@@ -45,24 +45,6 @@
       }
     },
     {
-      "name": "scriptorium",
-      "description": "Documentation and ticket production under a written house rulebook.",
-      "version": "2026.10.22",
-      "source": {
-        "source": "github",
-        "repo": "piyushsatti/scriptorium"
-      }
-    },
-    {
-      "name": "manifold",
-      "description": "Establish global Manifold spaces through guided discovery and interviews; model needs, requirements, systems and change.",
-      "version": "2026.10.22",
-      "source": {
-        "source": "github",
-        "repo": "piyushsatti/manifold"
-      }
-    },
-    {
       "name": "agent-tmux",
       "description": "Stdio MCP server that lets an agent see and lay out its own tmux session: list, capture, new windows and splits, wait for output, and type into panes it owns without pressing Enter",
       "version": "2026.10.22",

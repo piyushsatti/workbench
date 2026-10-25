@@ -23,16 +23,6 @@
       "sha": null
     },
     {
-      "name": "scriptorium",
-      "github": "piyushsatti/scriptorium",
-      "sha": null
-    },
-    {
-      "name": "manifold",
-      "github": "piyushsatti/manifold",
-      "sha": null
-    },
-    {
       "name": "agent-tmux",
       "path": "tools/agent-tmux"
     }
