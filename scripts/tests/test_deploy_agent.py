@@ -80,6 +80,20 @@ class DeployAgentTests(unittest.TestCase):
             self.assertNotIn("status line", output)
             self.assertNotIn("does not load", output)
 
+    def test_harness_copy_matching_a_hand_edited_shared_copy_is_left_alone(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            edited = (MODULE.AGENT / "AGENTS.md").read_text() + "Memory: read this machine's index.\n"
+            for rel in (".agents/AGENTS.md", ".codex/AGENTS.md", ".config/opencode/AGENTS.md"):
+                (home / rel).parent.mkdir(parents=True, exist_ok=True)
+                (home / rel).write_text(edited)
+            output = self.run_main(home, "--apply")
+            for rel in (".agents/AGENTS.md", ".codex/AGENTS.md", ".config/opencode/AGENTS.md"):
+                self.assertIn(f"CHECK   {home / rel} has its own content, left as is", output)
+                self.assertNotIn(f"CHANGED  {home / rel}", output)
+                self.assertEqual((home / rel).read_text(), edited)
+                self.assertFalse((home / (rel + ".pre-deploy")).exists())
+
     def test_committed_rules_include_the_current_version(self):
         known = MODULE.committed_rules()
         if not known:
@@ -231,7 +245,7 @@ class DeployAgentTests(unittest.TestCase):
             self.assertFalse((home / ".codex/AGENTS.md.pre-deploy").exists())
 
     def test_stale_deployed_codex_copy_is_updated_with_a_backup(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory() as temp, mock.patch.object(MODULE, "committed_rules", lambda: {b"old rules\n"}):
             home = Path(temp)
             for path in (home / ".agents/AGENTS.md", home / ".codex/AGENTS.md"):
                 path.parent.mkdir(parents=True, exist_ok=True)

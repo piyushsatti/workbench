@@ -242,9 +242,9 @@ def rules_copy(which, known=None):
     """Plan entry for one copy of agent/AGENTS.md (RULES_COPIES), or None with a CHECK line when the
     file has its own content.
 
-    The file is ours to update when it is missing, already equal to agent/AGENTS.md, equal to a
-    committed version of it (an earlier deploy's copy), or, for a harness copy, equal to the deployed
-    ~/.agents/AGENTS.md. Anything else is the user's: a line added by hand is never overwritten.
+    The file is ours to update when it is missing, already equal to agent/AGENTS.md, or equal to a
+    committed version of it (an earlier deploy's copy). Anything else is the user's: a line added by
+    hand is never overwritten, including in a harness copy that matches a hand-edited shared copy.
     """
     src, dst = AGENT / "AGENTS.md", HOME / RULES_COPIES[which]
     if not dst.exists():
@@ -253,9 +253,7 @@ def rules_copy(which, known=None):
         return (src, dst, "changed", None, None), None
     if filecmp.cmp(src, dst, shallow=False):
         return (src, dst, "same", None, None), None
-    deployed = HOME / RULES_COPIES["shared"]
-    earlier = dst.read_bytes() in (committed_rules() if known is None else known)
-    if earlier or (which != "shared" and deployed.is_file() and filecmp.cmp(deployed, dst, shallow=False)):
+    if dst.read_bytes() in (committed_rules() if known is None else known):
         return (src, dst, "changed", None, None), None
     if which == "shared":
         return None, (f"CHECK   {dst} has its own content, left as is. Move what every machine should "
