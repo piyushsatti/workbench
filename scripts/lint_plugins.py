@@ -95,16 +95,34 @@ def check_commands(label, config, dests, problems):
                 problems.append(("error", f"{label}: {found} is not installed by install.json"))
 
 
-def lint_plugin(plugin):
-    problems = []
-    name = plugin.name
+def read_manifests(plugin, problems):
     manifests = {}
     for harness, rel in MANIFESTS.items():
         if (plugin / rel).exists():
-            manifests[harness] = load_json(plugin / rel, problems, f"{name}/{rel}")
+            manifests[harness] = load_json(plugin / rel, problems, f"{plugin.name}/{rel}")
     manifests = {h: m for h, m in manifests.items() if m is not None}
     if not manifests:
-        problems.append(("error", f"{name}: no harness manifest"))
+        problems.append(("error", f"{plugin.name}: no harness manifest"))
+    return manifests
+
+
+def info_of(manifests):
+    first = next(iter(manifests.values()))
+    return {"version": first.get("version"), "description": first.get("description"), "harnesses": set(manifests)}
+
+
+def lint_third_party(plugin):
+    """Someone else's plugin: only what the catalogs need (its manifests), not this repo's conventions."""
+    problems = []
+    manifests = read_manifests(plugin, problems)
+    return problems, info_of(manifests) if manifests else {}
+
+
+def lint_plugin(plugin):
+    problems = []
+    name = plugin.name
+    manifests = read_manifests(plugin, problems)
+    if not manifests:
         return problems, {}
 
     for harness, manifest in manifests.items():
@@ -130,7 +148,7 @@ def lint_plugin(plugin):
         problems.append(("error", f"{name}/hooks/hooks.json: every harness auto-loads this path; use hooks/<harness>.json"))
     dests = installed_dests(plugin, problems)
     for harness, manifest in manifests.items():
-        if "hooks" in manifest:
+        if isinstance(manifest.get("hooks"), str):
             path = plugin / manifest["hooks"]
             if not path.exists():
                 problems.append(("error", f"{name}: {manifest['hooks']} named by the {harness} manifest does not exist"))
@@ -184,7 +202,7 @@ def lint_plugin(plugin):
         if re.search(r"(?<![\w.])~/\.pi/|\$HOME/\.pi/", text):
             problems.append(("error", f"{name}/{rel}: uses ~/.pi/, which belongs to Pi Agent; use ~/.local/state/{name}/"))
 
-    return problems, {"version": first.get("version"), "description": first.get("description"), "harnesses": set(manifests)}
+    return problems, info_of(manifests)
 
 
 def entry_source(harness, entry):
@@ -246,6 +264,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     listed = {entry["name"]: entry for entry in plugin_repos.entries(args.root)}
+    owner = json.loads((args.root / "plugins.json").read_text()).get("owner")
     repos = {entry["name"]: repo for entry, repo in plugin_repos.repos(args.root, args.source)}
     report, infos = [], {}
     for name in sorted(repos):
@@ -254,7 +273,9 @@ def main(argv=None):
         if not repos[name].is_dir():
             report.append(("warning", f"{name}: listed in plugins.json but no repo at {repos[name]}"))
             continue
-        problems, info = lint_plugin(repos[name])
+        github_owner = listed[name].get("github", "").split("/")[0]
+        third_party = bool(owner and github_owner and github_owner != owner)
+        problems, info = (lint_third_party if third_party else lint_plugin)(repos[name])
         report += problems
         if info:
             infos[name] = info

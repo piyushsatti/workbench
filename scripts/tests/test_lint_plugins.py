@@ -169,6 +169,21 @@ class LintPluginsTests(unittest.TestCase):
             sync(root)
             self.assertEqual(self.run_lint(root)[0], 0)
 
+    def test_third_party_plugins_are_checked_only_against_the_catalogs(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            plugin = root / "other"
+            base = {"name": "other", "version": "5.3.2", "description": "Theirs."}
+            write(plugin / ".claude-plugin/plugin.json", {**base, "hooks": ["./hooks/a.json", "./hooks/b.json"]})
+            write(plugin / ".codex-plugin/plugin.json", {**base, "hooks": "./hooks/a.json"})
+            subprocess.run(["git", "init", "-q", str(plugin)], check=True)
+            write(root / "pi/plugins.json", {"owner": "me", "plugins": [{"name": "other", "github": "them/other", "sha": "abc123"}]})
+            sync(root)
+            status, output = self.run_lint(root)
+            self.assertEqual(status, 0, output)
+            write(root / "pi/plugins.json", {"owner": "me", "plugins": [{"name": "other", "github": "me/other", "sha": "abc123"}]})
+            self.assert_error(root, "is not CalVer")
+
     def test_cursor_gets_no_catalog_and_no_copies(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

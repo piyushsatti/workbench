@@ -1,5 +1,5 @@
 {
-  "_comment": "The pi marketplace's plugins (brand pi, catalog hosted in this workbench repo). Most are a sibling repo each in ~/Source, with github where the repo lives and sha pinning the catalog entry once pushed (null until then). One with path instead lives in this repo at that folder.",
+  "_comment": "The pi marketplace's plugins (brand pi, catalog hosted in this workbench repo). Most are a sibling repo each in ~/Source, with github where the repo lives and sha pinning the catalog entry once pushed (null until then). One with path instead lives in this repo at that folder. An entry whose github owner is not ours is a third-party plugin, still cloned beside the others for its manifests; the lint checks it only against the catalogs, not CONVENTIONS.md.",
   "owner": "piyushsatti",
   "plugins": [
     {
@@ -25,6 +25,11 @@
     {
       "name": "agent-tmux",
       "path": "tools/agent-tmux"
+    },
+    {
+      "name": "ponytail",
+      "github": "DietrichGebert/ponytail",
+      "sha": "16352ac229eb08a9598dcae48fe9f2b342567d86"
     }
   ]
 }

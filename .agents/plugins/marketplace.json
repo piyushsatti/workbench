@@ -45,6 +45,17 @@
         "path": "./tools/agent-tmux"
       },
       "category": "Developer Tools"
+    },
+    {
+      "name": "ponytail",
+      "description": "Lazy senior dev mode. Forces the simplest, shortest solution that actually works: YAGNI, stdlib first, no unrequested abstractions.",
+      "version": "5.3.2",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/DietrichGebert/ponytail.git",
+        "sha": "16352ac229eb08a9598dcae48fe9f2b342567d86"
+      },
+      "category": "Productivity"
     }
   ]
 }

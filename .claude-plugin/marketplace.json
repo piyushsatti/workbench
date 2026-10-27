@@ -50,6 +50,16 @@
       "description": "Stdio MCP server that lets an agent see and lay out its own tmux session: list, capture, new windows and splits, wait for output, and type into panes it owns without pressing Enter",
       "version": "2026.10.22",
       "source": "./tools/agent-tmux"
+    },
+    {
+      "name": "ponytail",
+      "description": "Lazy senior dev mode. Forces the simplest, shortest solution that actually works: YAGNI, stdlib first, no unrequested abstractions.",
+      "version": "5.3.2",
+      "source": {
+        "source": "github",
+        "repo": "DietrichGebert/ponytail",
+        "sha": "16352ac229eb08a9598dcae48fe9f2b342567d86"
+      }
     }
   ]
 }
