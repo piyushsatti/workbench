@@ -22,7 +22,6 @@ Version-specific model catalogs, free-model lists, CLI invocations, bugs, and la
 
 ## Tool references
 
-- Before answering any question about an external library, framework, SDK, API, CLI tool, or cloud service, use Context7 to resolve its library identifier and query current documentation. Skip this only for the human's own code or business logic, general programming concepts, or an explicit request to answer from memory. If Context7 is unavailable, use current primary documentation and state the fallback.
 - Dispatch the `scrutineer` role when asked to audit, sanity-check, or verify a research notebook, findings document, or analysis before treating it as trustworthy. Scrutineer reports a claim ledger and evidence rigor without editing the target. Use code review for a diff and a builder for implementation.
 - Read a role-owned procedure before a multi-part design, architecture, or research effort when routing says that procedure applies.
 
