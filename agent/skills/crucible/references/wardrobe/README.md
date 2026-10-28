@@ -12,7 +12,7 @@ Defining a persona once here and composing it everywhere is the whole point: the
 
 1. Resolve the roster (below) or ask the user which lens fits.
 2. Read `references/wardrobe/hats/<name>.md` (paths are relative to the crucible skill folder).
-3. Compose: the hat file's **body** (the `## Role` … `## Severity anchors` sections) + the consumer's own stance rules → the dispatch prompt (or the in-thread persona for consult). **Exclude the YAML frontmatter** — `overlaps` is registry metadata for the panel composer and the overlap eval; naming other hats in the payload is irrelevant detail and measured downside, so it never reaches the reviewing model [D16, D13]. The shared severity taxonomy lives in `references/wardrobe/hats/HATS.md`, not in each hat — a consumer that needs the level definitions reads them from there.
+3. Compose: the hat file's **body** (the `## Role` … `## Severity anchors` sections) + the consumer's own stance rules → the dispatch prompt (or the in-thread persona for consult). **Exclude the YAML frontmatter** — `overlaps` is registry metadata for the panel composer and the overlap eval; naming other hats in the payload is irrelevant detail and measured downside, so it never reaches the reviewing model. The shared severity taxonomy lives in `references/wardrobe/hats/HATS.md`, not in each hat — a consumer that needs the level definitions reads them from there.
 4. If no roster hat fits, draft one inline for the run **and flag it for wardrobe addition** — do not silently invent a throwaway lens.
 
 ## Roster (v1)
@@ -25,7 +25,7 @@ Defining a persona once here and composing it everywhere is the whole point: the
 | `sre` | operability: observability, rollback, failure recovery, on-call reality |
 | `frontend` | interface/UX flaws, state-management traps, accessibility, perceived performance |
 | `product` | user-value gaps, wrong sequencing, does-anyone-need-this |
-| `coverage` | missing requirements, unstated assumptions, checklist integrity (D9 counterweight) |
+| `coverage` | missing requirements, unstated assumptions, checklist integrity (completeness guard counterweight) |
 | `simplifier` | YAGNI, deletable scope, cheaper paths to the same outcome |
 | `finance` | cost/ROI, runway impact, build-vs-buy |
 | `coach` | personal/life decisions: sustainability, values alignment, motivation reality |
@@ -52,4 +52,4 @@ Nothing here is invoked directly. If you want to *use* a lens:
 - adversarial attack/verify → **red-vs-blue**
 
 ## Status
-Hat files are **v1** (`status: v1` in each file's frontmatter), rebuilt to the persona/contract research findings (D12–D17). Rubrics and failure classes are expected to be revised after real review batches [D15] — bump `status` and run the overlap eval by hand (`hats/HATS.md`, Running the evals) when a definition changes.
+Hat files are **v1** (`status: v1` in each file's frontmatter), rebuilt to the persona/contract research findings (checklist-contract hats, no persona flattery, reasoning first, anchored severity, measured distinctness, persona drift). Rubrics and failure classes are expected to be revised after real review batches — bump `status` and run the overlap eval by hand (`hats/HATS.md`, Running the evals) when a definition changes.

@@ -14,7 +14,7 @@ Exactly one lens. Stay in-thread and conversational — do not dispatch subagent
 The user names it ("as an architect…"), or you propose one from the wardrobe roster that fits the idea and confirm before diving in. One hat only — if the user wants several perspectives, that's **hats**, not this.
 
 ### 2. Load the hat
-Read `references/wardrobe/hats/<name>.md` and work from its **body** — its `## Role`, `## Failure classes`, `## Evidence demands`, and `## Always ask` become how you engage; you genuinely reason from that lens. (The frontmatter, including `overlaps`, is registry metadata — you don't need it [D16].) If no roster hat fits, adopt the closest and say so, or draft the lens inline for this conversation and flag it for possible wardrobe addition (per `references/wardrobe/hats/HATS.md`).
+Read `references/wardrobe/hats/<name>.md` and work from its **body** — its `## Role`, `## Failure classes`, `## Evidence demands`, and `## Always ask` become how you engage; you genuinely reason from that lens. (The frontmatter, including `overlaps`, is registry metadata — you don't need it.) If no roster hat fits, adopt the closest and say so, or draft the lens inline for this conversation and flag it for possible wardrobe addition (per `references/wardrobe/hats/HATS.md`).
 
 ### 3. Think it through together
 Partner stance — not neutral, not adversarial:
@@ -24,7 +24,7 @@ Partner stance — not neutral, not adversarial:
 - Ground your worries in the hat's evidence bar — point at the specific thing, not vibes — but this is guidance-in-dialogue, not a logged finding.
 - It's fine to like the idea. A partner validates what's sound, not only what's wrong.
 
-### 3a. Keep the lens from drifting [D17]
+### 3a. Keep the lens from drifting
 Consult is the one review mode **not** immune to persona drift — the fresh-subagent dispatches (hats, red-vs-blue) reset each run, but this is a long in-thread session. Personas drift from their instructions within ~8 conversation turns as attention decays over the growing context, and **chain-of-thought does not stabilize the persona — it makes response variability worse** (PERSIST). So don't rely on "I'll reason my way back into the lens." Instead, **re-state the hat's `## Role` and `## Failure classes` to yourself roughly every 6–8 exchanges** and steer back to them. [The 6–8 cadence is a DEFAULT derived from the 8-round drift finding, not a tested schedule — tighten it if the dialogue is dense.]
 
 ### 4. Close with a lens summary

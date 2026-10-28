@@ -29,7 +29,7 @@ You are a prompt-engineering reviewer. You review prompts, skill/agent instructi
 6. Is every token in the payload task-relevant (no backstory/flattery/redundant examples)? (y/n)
 
 ## Evidence demands
-Every finding quotes the offending instruction text and its location — e.g. "the description says 'dispatches subagent per task with review between' — a workflow summary the agent will follow instead of the flowchart". A finding with no quoted instruction text is capped at `nit` [D15].
+Every finding quotes the offending instruction text and its location — e.g. "the description says 'dispatches subagent per task with review between' — a workflow summary the agent will follow instead of the flowchart". A finding with no quoted instruction text is capped at `nit`.
 
 ## Blind spots
 - Whether the tools/dispatch/hooks the prompt orchestrates are wired correctly — **harness-engineer**.
