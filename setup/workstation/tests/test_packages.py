@@ -87,6 +87,35 @@ class PackagesTests(unittest.TestCase):
         pinned = [w for line in install_lines for w in line.split() if re.match(r"^[a-z0-9][a-z0-9.+-]*=", w)]
         self.assertEqual(pinned, [])
 
+    def _stub_code_repository(self, fingerprint):
+        """Stubs for adding the VS Code repository: the key download, gpg reporting `fingerprint`, and root-only tools."""
+        self._stub("curl", 'printf "curl %s\\n" "$*" >> "$COMMAND_LOG"\nwhile [ $# -gt 1 ]; do shift; done\n: > "$1"\n')
+        self._stub(
+            "gpg",
+            'printf "gpg %s\\n" "$*" >> "$COMMAND_LOG"\n'
+            f'case " $* " in *" --show-keys "*) printf "pub:-:2048:1:X::::\\nfpr:::::::::{fingerprint}:\\n";;\n'
+            '*" --dearmor "*) while [ "$1" != --output ]; do shift; done; : > "$2";; esac\n',
+        )
+        self._stub("install", 'printf "install %s\\n" "$*" >> "$COMMAND_LOG"\n')
+        temp = self.root / "work"
+        self._stub("mktemp", f'mkdir -p "{temp}" && echo "{temp}"\n')
+        self._stub("dpkg", "echo amd64\n")
+
+    def test_code_repository_key_must_have_microsofts_fingerprint(self):
+        for fingerprint, ok in (("BC528686B50D79E339D3721CEB3E94ADBE1229CF", True), ("0" * 40, False)):
+            self.log.unlink(missing_ok=True)
+            self._stub_code_repository(fingerprint)
+            result = self._run("linux-full")
+            keyring = [line for line in self.log.read_text().splitlines()
+                       if line.startswith("install ") and "workstation-microsoft.gpg" in line]
+            if ok:
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertTrue(keyring)
+            else:
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("fingerprint", result.stderr)
+                self.assertEqual(keyring, [])
+
     def test_unknown_profile_preserves_profile_error(self):
         result = self._run("unknown-profile")
         self.assertNotEqual(result.returncode, 0)

@@ -11,8 +11,5 @@ Ask these questions for every system:
 1. Where does it need a circuit breaker? Bound retries and reconnects with a ceiling and a reachable failure state. State what trips the breaker, or why none is needed.
 2. How can an operator distinguish healthy silence from a dead watcher? Use a heartbeat, dead-man check, or independent watcher, and bind the monitor to a durable lifecycle.
 
-Before a multi-part design, architecture, or research effort, read
-`../../orchestration/procedures.md`. Multi-part design produces
-project-owned roadmap navigation and a decision ledger before design discussion
-starts. Prioritize both across groups and within each group.
+Before a multi-part design, architecture, or research effort, read `../../orchestration/procedures.md`. Multi-part design produces project-owned roadmap navigation and a decision ledger before design discussion starts. Prioritize both across groups and within each group.
 

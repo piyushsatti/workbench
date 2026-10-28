@@ -1,8 +1,17 @@
+{{- if eq .chezmoi.os "darwin" -}}
 # Source .bashrc for interactive shells (PATH setup lives there)
 [[ -f ~/.bashrc ]] && source ~/.bashrc
-{{- if eq .chezmoi.os "darwin" }}
 
 alias tailscale="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+{{- else -}}
+# A login bash reads only the first of ~/.bash_profile, ~/.bash_login and
+# ~/.profile, so run Ubuntu's ~/.profile here (~/.local/bin, rustup's env); it
+# sources ~/.bashrc itself. Without one, source ~/.bashrc.
+if [[ -f ~/.profile ]]; then
+  source ~/.profile
+elif [[ -f ~/.bashrc ]]; then
+  source ~/.bashrc
+fi
 {{- end }}
 
 # Machine-local additions go in ~/.bash_profile.local (not managed)

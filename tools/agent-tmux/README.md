@@ -67,4 +67,4 @@ agent-tmux is a `pi` plugin, cataloged from this folder rather than its own repo
 cd server && GOCACHE=$TMPDIR/gocache go test ./...
 ```
 
-The tests use a fake tmux and a fake `/proc`. `TestProcTreeRealProc` reads the real `/proc` and fails on macOS. Results are in [VERIFIED.md](VERIFIED.md).
+The tests use a fake tmux and a fake `/proc`. `TestProcTreeRealProc` reads the real `/proc` and skips where there is none, as on macOS. Results are in [VERIFIED.md](VERIFIED.md).

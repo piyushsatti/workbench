@@ -5,7 +5,29 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"syscall"
 )
+
+// LockDir takes an exclusive flock on dir, creating it with mode 0700 when
+// missing, and returns the function that releases it. A config edit holds it
+// from its read to its rename, so two edits at once cannot lose either one.
+func LockDir(dir string) (func(), error) {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return nil, err
+	}
+	d, err := os.Open(dir)
+	if err != nil {
+		return nil, err
+	}
+	if err := syscall.Flock(int(d.Fd()), syscall.LOCK_EX); err != nil {
+		d.Close()
+		return nil, fmt.Errorf("locking %s: %w", dir, err)
+	}
+	return func() {
+		syscall.Flock(int(d.Fd()), syscall.LOCK_UN)
+		d.Close()
+	}, nil
+}
 
 // WriteFile replaces path with data without ever leaving a half-written file:
 // the old bytes go to path+".prev", the new ones to a temp file in the same

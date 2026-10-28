@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 )
 
 type Object struct {
@@ -62,10 +63,11 @@ func (o *Object) Get(key string) (json.RawMessage, bool) {
 	return v, ok
 }
 
-// Child returns the object under key, or an empty one when the key is absent.
+// Child returns the object under key, or an empty one when the key is absent
+// or null.
 func (o *Object) Child(key string) (*Object, error) {
 	v, ok := o.vals[key]
-	if !ok {
+	if !ok || string(bytes.TrimSpace(v)) == "null" {
 		return New(), nil
 	}
 	c, err := Parse(v)
@@ -173,18 +175,15 @@ func (a Array) Marshal() json.RawMessage {
 	return append(append([]byte{'['}, bytes.Join(parts, []byte{','})...), ']')
 }
 
-// Index returns the position of the first element that decodes to the string
-// s, or -1.
-func (a Array) Index(s string) int {
-	for i, e := range a {
+// WithoutStrings drops every element that decodes to one of ss.
+func (a Array) WithoutStrings(ss []string) Array {
+	out := Array{}
+	for _, e := range a {
 		var got string
-		if json.Unmarshal(e, &got) == nil && got == s {
-			return i
+		if json.Unmarshal(e, &got) == nil && slices.Contains(ss, got) {
+			continue
 		}
+		out = append(out, e)
 	}
-	return -1
-}
-
-func (a Array) Without(i int) Array {
-	return append(append(Array{}, a[:i]...), a[i+1:]...)
+	return out
 }

@@ -77,17 +77,6 @@ def dotfiles_lock():
     return json.loads((ROOT / selected()["dotfiles_lock"]).read_text())
 
 
-def pending(note):
-    if note not in REPORT["pending"]:
-        REPORT["pending"].append(note)
-
-
-NO_DOTFILES_LOCK = (
-    "Dotfiles were not applied: this profile has no rendered Dotfiles lock yet. "
-    "Apply setup/dotfiles with chezmoi for this profile."
-)
-
-
 def run(*args, cwd=None, capture=False, timeout=300, env=None):
     return subprocess.run(
         [str(a) for a in args],
@@ -202,12 +191,37 @@ def rendered_dotfiles_digest(rendered):
     return digest.hexdigest()
 
 
+def chezmoi_binary():
+    bundled = HOME / ".local/bin/chezmoi"
+    return bundled if os.access(bundled, os.X_OK) else shutil.which("chezmoi")
+
+
+def chezmoi_owns_dotfiles():
+    """The chezmoi binary when the user's chezmoi is initialised from this repo's Dotfiles source, else None.
+
+    chezmoi then owns the dotfiles: the install leaves them alone and verify checks only that chezmoi has nothing
+    to apply. The locked render is for machines where chezmoi is not set up from this source."""
+    binary = chezmoi_binary()
+    if not binary:
+        return None
+    result = subprocess.run(
+        [str(binary), "source-path"], env=dict(os.environ, HOME=str(HOME)),
+        capture_output=True, text=True, timeout=60, check=False,
+    )
+    if result.returncode or not result.stdout.strip():
+        return None
+    try:
+        ours = resolve_dotfiles_source()
+    except RuntimeError:
+        return None
+    return Path(binary) if Path(result.stdout.strip()).resolve() == ours else None
+
+
 def render_dotfiles():
     """Render and lock the exact Ubuntu targets without applying Chezmoi state."""
     lock = dotfiles_lock()
     source = resolve_dotfiles_source()
-    bundled = HOME / ".local/bin/chezmoi"
-    binary = bundled if os.access(bundled, os.X_OK) else shutil.which("chezmoi")
+    binary = chezmoi_binary()
     if not binary:
         raise RuntimeError("Chezmoi is required to render canonical Dotfiles")
     targets = tuple(lock["targets"])
@@ -368,19 +382,15 @@ def chezmoi_tool():
     if path:
         keep("chezmoi", path)
         return
-    architecture = {"x86_64": "amd64", "aarch64": "arm64"}[os.uname().machine]
+    # The digest is pinned in versions.json, not read from a checksums file of the same release.
+    machine = os.uname().machine
+    architecture = {"x86_64": "amd64", "aarch64": "arm64"}.get(machine)
+    checksum = VERSIONS["chezmoiSha256"].get(architecture)
+    if not checksum:
+        raise RuntimeError(f"There is no pinned chezmoi for {machine}; add its SHA-256 to versions.json")
     version = VERSIONS["chezmoi"]
     asset = f"chezmoi_{version}_linux_{architecture}.tar.gz"
     url = f"https://github.com/twpayne/chezmoi/releases/download/v{version}"
-    sums = download(
-        f"{url}/chezmoi_{version}_checksums.txt",
-        DATA / "cache" / f"chezmoi-{version}.sha256",
-    )
-    checksum = next(
-        line.split()[0]
-        for line in sums.read_text().splitlines()
-        if line.split()[-1].lstrip("*") == asset
-    )
     archive = download(f"{url}/{asset}", DATA / "cache" / asset, checksum)
     with tarfile.open(archive) as tar:
         write(HOME / ".local/bin/chezmoi", tar.extractfile("chezmoi").read(), 0o755)
@@ -498,9 +508,18 @@ def plugins():
         ):
             run("cargo", "build", "--release", "--locked", cwd=source, timeout=1200)
         target = HOME / ".tmux/plugins" / plugin["name"]
-        install_tree(source, target, plugin["commit"])
+        install_tree(source, target, plugin_revision(plugin))
         if plugin["name"] == "tmux-resurrect":
             patch_resurrect(target)
+
+
+def plugin_revision(plugin):
+    """The installed marker of a plugin: its commit, and for tmux-resurrect also the SHA-256 of the Dotfiles patch,
+    so an edited patch makes a fresh copy of the pinned tree instead of failing to apply over the old one."""
+    if plugin["name"] != "tmux-resurrect":
+        return plugin["commit"]
+    patch = resolve_dotfiles_source() / ".patches/tmux-resurrect.diff"
+    return f"{plugin['commit']} {hashlib.sha256(patch.read_bytes()).hexdigest()}"
 
 
 def resurrect_patch(tree, *options):
@@ -548,10 +567,12 @@ def nerd_font():
 
 def config():
     if dotfiles_locked():
-        apply_dotfiles()
-    elif has("shell"):
-        print(NO_DOTFILES_LOCK)
-        pending(NO_DOTFILES_LOCK)
+        if chezmoi_owns_dotfiles():
+            source = resolve_dotfiles_source()
+            REPORT["dotfiles"] = {"owner": "chezmoi", "source": str(source)}
+            print(f"chezmoi manages the dotfiles from {source}; left as they are")
+        else:
+            apply_dotfiles()
     if has("agents"):
         agent_seeds()
 
@@ -813,8 +834,8 @@ def verify_tmux():
 
 
 def reload_tmux():
-    # Only a ~/.tmux.conf this install wrote is reloaded; without a dotfiles lock there is none.
-    if not dotfiles_locked():
+    # Only a ~/.tmux.conf this install wrote is reloaded: none without a dotfiles lock, nor when chezmoi owns it.
+    if not dotfiles_locked() or chezmoi_owns_dotfiles():
         return
     current = subprocess.run(
         ["tmux", "list-sessions", "-F", "#{session_id}"],
@@ -885,6 +906,49 @@ def docker_group_pending():
     return user in group.gr_mem and group.gr_gid not in os.getgroups()
 
 
+def verify_dotfiles(checks):
+    """The dotfiles part of verify: chezmoi has nothing to apply when it owns them, else the locked render's checks."""
+    owner = chezmoi_owns_dotfiles() if dotfiles_locked() else None
+    if has("tmux") and not (dotfiles_locked() and not owner):
+        checks.append("tmux plugins, resurrect patches and compiled thumbs")
+    if owner:
+        # Scripts (run_after_*) run on every apply, so they always show; only files count.
+        pending_changes = run(owner, "status", "--exclude=scripts", capture=True, env=dict(os.environ, HOME=str(HOME)))
+        if pending_changes.strip():
+            raise RuntimeError("chezmoi has changes to apply; review them with chezmoi diff:\n" + pending_changes.rstrip())
+        checks.append(f"chezmoi has nothing to apply from {resolve_dotfiles_source()}")
+    elif dotfiles_locked():
+        verify_locked_dotfiles(checks)
+
+
+def verify_locked_dotfiles(checks):
+    """The locked render is what is installed, and the shell and tmux it configures behave."""
+    if has("tmux"):
+        # The status bar, prefix and popup checks read the locked ~/.tmux.conf.
+        verify_tmux()
+        checks.append(
+            "tmux plugins, resurrect patches, compiled thumbs, Nord status bar, prefix and popup"
+        )
+    aliases = run(
+        "bash",
+        "--noprofile",
+        "--rcfile",
+        HOME / ".bashrc",
+        "-ic",
+        "alias ll; declare -F z; command -v starship",
+        capture=True,
+    )
+    if "eza -la" not in aliases:
+        raise RuntimeError("ll is not configured")
+    checks.append("interactive shell aliases, Starship and zoxide")
+    _, rendered, digest = render_dotfiles()
+    for rel_name, (expected, _) in rendered.items():
+        target = HOME / rel_name
+        if not target.is_file() or not dotfile_matches(rel_name, expected, target.read_bytes()):
+            raise RuntimeError(f"Canonical Dotfiles target mismatch: {target}")
+    checks.append(f"locked canonical Dotfiles profile {digest[:12]}")
+
+
 def verify():
     checks = []
     docker_note = None
@@ -924,7 +988,7 @@ def verify():
     if has("tmux"):
         for plugin in pinned_plugins():
             marker = HOME / ".tmux/plugins" / plugin["name"] / ".workstation-revision"
-            if marker.read_text().strip() != plugin["commit"]:
+            if marker.read_text().strip() != plugin_revision(plugin):
                 raise RuntimeError(f"Plugin mismatch: {plugin['name']}")
         if not resurrect_patch(HOME / ".tmux/plugins/tmux-resurrect", "--reverse", "--check"):
             raise RuntimeError("tmux-resurrect local patches are not applied")
@@ -932,33 +996,7 @@ def verify():
             path = HOME / ".tmux/plugins/tmux-thumbs/target/release" / executable
             if not os.access(path, os.X_OK):
                 raise RuntimeError(f"Missing precompiled tmux helper: {executable}")
-    if has("tmux") and dotfiles_locked():
-        # The status bar, prefix and popup checks read the locked ~/.tmux.conf.
-        verify_tmux()
-        checks.append(
-            "tmux plugins, resurrect patches, compiled thumbs, Nord status bar, prefix and popup"
-        )
-    elif has("tmux"):
-        checks.append("tmux plugins, resurrect patches and compiled thumbs")
-    if dotfiles_locked():
-        aliases = run(
-            "bash",
-            "--noprofile",
-            "--rcfile",
-            HOME / ".bashrc",
-            "-ic",
-            "alias ll; declare -F z; command -v starship",
-            capture=True,
-        )
-        if "eza -la" not in aliases:
-            raise RuntimeError("ll is not configured")
-        checks.append("interactive shell aliases, Starship and zoxide")
-        _, rendered, digest = render_dotfiles()
-        for rel_name, (expected, _) in rendered.items():
-            target = HOME / rel_name
-            if not target.is_file() or not dotfile_matches(rel_name, expected, target.read_bytes()):
-                raise RuntimeError(f"Canonical Dotfiles target mismatch: {target}")
-        checks.append(f"locked canonical Dotfiles profile {digest[:12]}")
+    verify_dotfiles(checks)
     if has("gui"):
         family = run(
             "fc-match", "-f", "%{family}", "JetBrainsMono Nerd Font", capture=True
@@ -989,8 +1027,6 @@ def verify():
         REPORT["pending"].append(
             "Continue is installed; its existing model configuration is preserved. A fresh machine needs an inference endpoint."
         )
-    if has("shell") and not dotfiles_locked():
-        REPORT["pending"].append(NO_DOTFILES_LOCK)
     if docker_note:
         REPORT["pending"].append(docker_note)
     save_report()

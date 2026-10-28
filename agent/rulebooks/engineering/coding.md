@@ -44,7 +44,7 @@ Module-level constants and globals (for example `BATCH_SIZE = 1000`) go at the t
 Use the layout the language's own documentation prescribes.
 
 - Go: `foo_test.go` beside `foo.go`, in the same directory (`go help test`).
-- Python: tests live in the top-level `tests/` directory, mirroring the source path of what they test: source `path/to/foo` becomes `tests/path/to/test_foo`, or `tests/unit/path/to/test_foo` and `tests/integration/path/to/test_foo` where the project splits its suite by whether a test needs an external service. Never colocate tests beside the source under a nested `tests/` subdir.
+- Python: tests live in the top-level `tests/` directory, mirroring the source path of what they test: source `path/to/foo` becomes `tests/path/to/test_foo`, or `tests/unit/path/to/test_foo` and `tests/integration/path/to/test_foo` where the project splits its suite by whether a test needs an external service. In a repo of separately tested components, each with its own README and suite, a component's own `tests/` folder is its top-level `tests/` directory, mirroring source paths within that component. Otherwise never colocate tests beside the source under a nested `tests/` subdir.
 
 Framework and exact naming are project-specific and live in that project's CLAUDE.md.
 

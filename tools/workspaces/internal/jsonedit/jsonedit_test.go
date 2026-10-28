@@ -115,19 +115,16 @@ func TestArray(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if i := a.Index("café"); i != 1 {
-		t.Errorf("Index(café) = %d, want 1 (decoded comparison)", i)
+	if got := string(a.WithoutStrings([]string{"café"}).Marshal()); got != `["~/a","/b"]` {
+		t.Errorf("WithoutStrings(café) = %s, want the decoded value matched", got)
 	}
-	if i := a.Index("nope"); i != -1 {
-		t.Errorf("Index(nope) = %d", i)
-	}
-	if got := string(a.Without(1).Marshal()); got != `["~/a","/b"]` {
-		t.Errorf("Without = %s", got)
+	if got := string(a.WithoutStrings([]string{"nope"}).Marshal()); got != `["~/a","café","/b"]` {
+		t.Errorf("WithoutStrings(nope) = %s", got)
 	}
 	if got := string(a.Marshal()); got != `["~/a","café","/b"]` {
 		t.Errorf("Marshal = %s, want the written forms", got)
 	}
-	if got := string(a.Without(0).Without(0).Without(0).Marshal()); got != `[]` {
+	if got := string(a.WithoutStrings([]string{"~/a", "café", "/b"}).Marshal()); got != `[]` {
 		t.Errorf("empty = %s", got)
 	}
 	if a, err := ParseArray(nil); err != nil || len(a) != 0 {

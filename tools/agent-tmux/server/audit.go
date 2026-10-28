@@ -48,6 +48,22 @@ func orDash(s string) string {
 	return s
 }
 
+// privateDir makes dir with mode 0700, and tightens it to 0700 when it already exists with a looser mode, which
+// MkdirAll alone leaves as it is.
+func privateDir(dir string) error {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	fi, err := os.Stat(dir)
+	if err != nil {
+		return err
+	}
+	if fi.Mode().Perm() != 0o700 {
+		return os.Chmod(dir, 0o700)
+	}
+	return nil
+}
+
 func (a *Audit) Write(r auditRec) error {
 	if a == nil {
 		return errors.New("audit log path unknown")
@@ -57,7 +73,7 @@ func (a *Audit) Write(r auditRec) error {
 		orDash(r.result), r.bytes, orDash(r.created), orDash(strings.Join(r.args, ";")))
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if err := os.MkdirAll(filepath.Dir(a.path), 0o700); err != nil {
+	if err := privateDir(filepath.Dir(a.path)); err != nil {
 		return err
 	}
 	f, err := os.OpenFile(a.path, os.O_WRONLY|os.O_APPEND|os.O_CREATE|syscall.O_NOFOLLOW, 0o600)

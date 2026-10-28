@@ -100,6 +100,46 @@ class ResurrectPatchTests(unittest.TestCase):
             MODULE.plugins()
             self.assertTrue(MODULE.resurrect_patch(installed, "--reverse", "--check"))
 
+    def test_an_edited_patch_reinstalls_the_plugin_and_verifies(self):
+        sources = self.home / "sources"
+        dotfiles = self.home / "dotfiles"
+        (dotfiles / ".patches").mkdir(parents=True)
+        patch = dotfiles / ".patches/tmux-resurrect.diff"
+        patch.write_text(PATCH.read_text())
+        (dotfiles / ".chezmoidata").mkdir()
+        pins = PATCH.parents[1] / ".chezmoidata/tmux_plugins.json"
+        (dotfiles / ".chezmoidata/tmux_plugins.json").write_text(pins.read_text())
+
+        def checkout(name, url, commit):
+            source = sources / name
+            source.mkdir(parents=True, exist_ok=True)
+            if name == "tmux-resurrect":
+                write_tree(source, unpatched_files())
+            if name == "tmux-thumbs":
+                write_tree(source, {"target/release/tmux-thumbs": ""})
+            return source
+
+        run = self.home / "recovery"
+        run.mkdir()
+        with (
+            mock.patch.object(MODULE, "HOME", self.home),
+            mock.patch.object(MODULE, "RUN", run),
+            mock.patch.object(MODULE, "checkout", checkout),
+            mock.patch.object(MODULE, "resolve_dotfiles_source", lambda: dotfiles),
+        ):
+            MODULE.plugins()
+            # Edit one added line: the new patch still applies to upstream, not on top of the old one.
+            lines = PATCH.read_text().splitlines(keepends=True)
+            first_added = next(i for i, line in enumerate(lines) if line.startswith("+") and not line.startswith("+++"))
+            lines[first_added] = lines[first_added].rstrip("\n") + " # edited\n"
+            patch.write_text("".join(lines))
+            MODULE.plugins()
+            installed = self.home / ".tmux/plugins/tmux-resurrect"
+            self.assertTrue(MODULE.resurrect_patch(installed, "--reverse", "--check"))
+            marker = (installed / ".workstation-revision").read_text().strip()
+            commit = next(p["commit"] for p in MODULE.pinned_plugins() if p["name"] == "tmux-resurrect")
+            self.assertEqual(marker, MODULE.plugin_revision({"name": "tmux-resurrect", "commit": commit}))
+
 
 if __name__ == "__main__":
     unittest.main()

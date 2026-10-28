@@ -21,10 +21,3 @@ map("v", "<C-/>", "gc",  { desc = "Toggle Comment", remap = true })
 -- ── Terminal ───────────────────────────────────────────────────────────────
 -- Ctrl+`: toggle Snacks floating terminal (LazyVim built-in)
 map("n", "<C-`>", function() require("snacks").terminal.toggle() end, { desc = "Toggle Terminal" })
-
--- ── Window Navigation ──────────────────────────────────────────────────────
--- Ctrl+hjkl to move between splits
-map("n", "<C-h>", "<C-w>h", { desc = "Move to Left Window" })
-map("n", "<C-j>", "<C-w>j", { desc = "Move to Bottom Window" })
-map("n", "<C-k>", "<C-w>k", { desc = "Move to Top Window" })
-map("n", "<C-l>", "<C-w>l", { desc = "Move to Right Window" })

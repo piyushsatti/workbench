@@ -144,10 +144,11 @@ func (a *App) policyRm(args []string) int {
 				return "", code
 			}
 		}
-		e, ok := a.findEntry(entries, arg)
-		if !ok {
+		found := a.findEntries(entries, arg)
+		if len(found) == 0 {
 			return "", a.fail(exitUsage, "%s does not hold %s", list, arg)
 		}
+		e := found[0]
 		if code := a.confirm(*yes, fmt.Sprintf("Remove %s from %s?", e.Written, list)); code != exitOK {
 			return "", code
 		}
@@ -156,7 +157,7 @@ func (a *App) policyRm(args []string) int {
 		if err != nil {
 			return "", a.fail(exitConfig, "%s: %v", list, err)
 		}
-		top.Set(list, items.Without(items.Index(e.Written)).Marshal(), spacesKeyOrder)
+		top.Set(list, items.WithoutStrings(writtenForms(found)).Marshal(), spacesKeyOrder)
 		return "removed " + e.Written + " from " + list, exitOK
 	})
 }

@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"runtime"
 	"testing"
 
 	"workspaces/internal/config"
@@ -29,6 +30,12 @@ func TestMatches(t *testing.T) {
 		if got := Matches(tt.path, tt.entry); got != tt.want {
 			t.Errorf("Matches(%q, %q) = %v, want %v", tt.path, tt.entry.Path, got, tt.want)
 		}
+	}
+}
+
+func TestFoldCaseDefaultsToTheOS(t *testing.T) {
+	if want := runtime.GOOS == "darwin"; foldCase != want {
+		t.Errorf("foldCase = %v on %s, want %v", foldCase, runtime.GOOS, want)
 	}
 }
 

@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ALLOWED_KEYS = {"name", "description", "allowed-tools"}
-EXPLICIT_ONLY = ("grill-me", "teach")
+EXPLICIT_ONLY = ("grill-me", "save-state", "teach")
 
 
 def skills():

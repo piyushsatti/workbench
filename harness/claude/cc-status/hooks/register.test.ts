@@ -27,6 +27,12 @@ test('ctxCells: a cell per 5%, every part with tokens shown, free the rest', () 
   expect(ctxCells({ fixed: 300000, input: 1, output: 1, tools: 1 }, 256000, 20)).toBe('fffffffffffffffffiot')
 })
 
+test('ctxCells: no window measured yet is all free, and returns', () => {
+  for (const window of [0, -1, Number.NaN]) {
+    expect(ctxCells({ fixed: 100, input: 1, output: 0, tools: 0 }, window, 20)).toBe('.'.repeat(20))
+  }
+})
+
 test('limits: 5h with its reset time, 7d with its reset day', () => {
   const l = {
     rate_limits: { five_hour: { used_percentage: 14 }, seven_day: { used_percentage: 79.5 } },
@@ -77,4 +83,18 @@ test('/mem lists the memory files from the usage breakdown', async ($, on) => {
   const ran = await $.command.run({ command: 'mem' } as never)
 
   expect(JSON.stringify(ran)).toContain('Project  ~/Source/CLAUDE.md  2.4k')
+})
+
+test('a compaction re-measures the context, so the footer redraws without waiting for a turn', async ($, on) => {
+  let measured = 0
+  on('session.usage', () => {
+    measured += 1
+    return { value: { rateLimits: [], context: { window: 1, tokens: 1, percent: 1 } } } as never
+  })
+  const messages = [{ role: 'user', text: 'the summary', toolUses: [] }]
+  on('session.compact', () => ({ messages }) as never)
+
+  await $.session.compact({ trigger: 'manual', messages } as never)
+
+  expect(measured).toBe(1)
 })

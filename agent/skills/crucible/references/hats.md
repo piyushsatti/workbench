@@ -24,7 +24,7 @@ Every rule below cites a design decision (D-number) in `references/wardrobe/adve
 Confirm the artifact — plan, design doc, code, architecture, decision.
 
 ### 2. Pick 3–4 hats — from the wardrobe
-Hats are **chosen from the shared wardrobe** (`references/wardrobe/`), not invented per-run. Propose 3–4 roster hats that fit the artifact and confirm; the user may name others. **Distinctness test** [D3/D16, formalized in `references/wardrobe/hats/HATS.md`]: each hat must own a failure class the others do not — compare each candidate's `## Failure classes` (body) against the `overlaps` field (frontmatter); if two would flag the same issues, swap one out. Distinctness is declared here, then *measured* by the overlap eval — never assumed [D16]. If the artifact's value is exhaustiveness (requirements, checklist, migration inventory), one hat must be the **coverage** lens [D9].
+Hats are **chosen from the shared wardrobe** (`references/wardrobe/`), not invented per-run. Propose 3–4 roster hats that fit the artifact and confirm; the user may name others. **Distinctness test** [D3/D16, formalized in `references/wardrobe/hats/HATS.md`]: each hat must own a failure class the others do not — compare each candidate's `## Failure classes` (body) against the `overlaps` field (frontmatter); if two would flag the same issues, swap one out. Distinctness is declared here, then *measured* by the overlap eval (a procedure run by hand when a hat is added or changed, `references/wardrobe/hats/HATS.md`; nothing runs it automatically) — never assumed [D16]. If the artifact's value is exhaustiveness (requirements, checklist, migration inventory), one hat must be the **coverage** lens [D9].
 
 A requested lens that isn't in the wardrobe: draft it inline for this run following the HATS.md contract, and flag it for wardrobe addition — don't silently improvise a vibe.
 
@@ -51,8 +51,7 @@ Every panelist prompt carries the artifact and enforces:
 
 ### 4. Per-hat output contract — reasoning-first [D14]
 
-Analysis comes first as free prose; structured findings come last. Never assign a
-severity or verdict before the evidence is quoted [D14, D15].
+Analysis comes first as free prose; structured findings come last. Never assign a severity or verdict before the evidence is quoted [D14, D15].
 
 ```markdown
 # [Hat] review

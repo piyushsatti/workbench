@@ -232,6 +232,9 @@ func TestPolicyRm(t *testing.T) {
 			wantSpaces: "{\n  \"allow_launch\": [\n    \"~/a\",\n    \"~/c\"\n  ]\n}\n"},
 		{name: "last entry leaves an empty list", spaces: `{"allow_launch":["~/a"]}`, args: []string{"policy", "rm", "--yes", "allow_launch", "~/a"},
 			wantSpaces: "{\n  \"allow_launch\": []\n}\n"},
+		{name: "every duplicate", spaces: `{"allow_launch":["~/a","/opt/b","~/a"]}`,
+			args: []string{"policy", "rm", "--yes", "allow_launch", "~/a"},
+			wantSpaces: "{\n  \"allow_launch\": [\n    \"/opt/b\"\n  ]\n}\n"},
 	})
 }
 

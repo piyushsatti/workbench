@@ -1,5 +1,9 @@
 {
   "chezmoi": "2.70.5",
+  "chezmoiSha256": {
+    "amd64": "6a76a0ac3718f0d45b34b4b57067f9556f8f6042e3da710a3c496838362aca14",
+    "arm64": "4f4f31d0a10ed3b955e814a5ae20075426e27c9d3a09f536bfa4a6c8718353f2"
+  },
   "fontVersion": "3.4.0",
   "fontSha256": "ef552a3e638f25125c6ad4c51176a6adcdce295ab1d2ffacf0db060caf8c1582"
 }

@@ -148,7 +148,7 @@ func (s *Server) scanPane(ctx context.Context, id string, re *regexp.Regexp, n i
 	out, capErr := s.tm.run("capture-pane", "-p", "-t", id, "-S", "-"+strconv.Itoa(n))
 	sess, inScope := s.paneInScope(id)
 	if !inScope {
-		return "", false, &toolErr{"out_of_scope", "pane " + id + " closed or left the home session during the wait"}
+		return "", false, &toolErr{"out_of_scope", "pane " + id + " closed, or is outside the home session without its owner tag, during the wait"}
 	}
 	if ok, err := s.paneOwned(id, sess); err != nil || !ok {
 		return "", false, orRefused(err, "pane "+id+" stopped being agent-tmux-owned during the wait")

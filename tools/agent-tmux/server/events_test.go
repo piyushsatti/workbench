@@ -528,6 +528,17 @@ func TestTypedMarker(t *testing.T) {
 			t.Errorf("want one set-option -u, got %d", unset)
 		}
 	})
+	t.Run("cleared when the text only appears earlier in the prompt", func(t *testing.T) {
+		h := newLayoutHarness(t)
+		h.ownTag("%5")
+		h.ok(t, "tmux_send", sendArgs("%5", "ls"))
+		// The command ran and a new prompt came back; "ls" is now only inside the folder name.
+		h.f.pane("%5")["content"] = "~/tools $ ls\na b\n~/tools $ \n"
+		h.call1(t, "tmux_list", "")
+		if typed(h) != "" {
+			t.Errorf("marker should clear: the last line ends in the prompt, not the typed text")
+		}
+	})
 	t.Run("cleared when a program other than a shell runs", func(t *testing.T) {
 		h := newLayoutHarness(t)
 		h.ownTag("%5")

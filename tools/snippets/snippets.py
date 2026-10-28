@@ -56,7 +56,8 @@ def parse(slug, source):
     for line in (m.group(1) if m else "").splitlines():
         kv = re.match(r"^(\w+):\s*(.*)$", line)
         if kv:
-            meta[kv.group(1)] = kv.group(2).strip()
+            # A YAML comment starts at a '#' after whitespace; "C# tips" keeps its '#'.
+            meta[kv.group(1)] = re.sub(r"\s+#.*$", "", kv.group(2)).strip()
     return {
         "slug": slug,
         "title": meta.get("title") or slug,

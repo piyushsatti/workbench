@@ -70,6 +70,9 @@ export function ctxParts(
 // `width` cells over the window, a letter per cell: f fixed, i input, o output, t tools, . free. A part
 // with any tokens gets at least one cell, taken from the largest part.
 export function ctxCells(p: CtxParts, window: number, width: number): string {
+  // No window to measure against (0 before the first response): all free. Dividing by it would give
+  // Infinity cells, which the trimming loop below never brings down.
+  if (!(window > 0)) return '.'.repeat(width)
   const order = ['fixed', 'input', 'output', 'tools'] as const
   const n = order.map(k => (p[k] > 0 ? Math.max(1, Math.round((p[k] * width) / window)) : 0))
   while (n.reduce((a, b) => a + b, 0) > width) {
@@ -213,8 +216,10 @@ export const register: Register = on => {
     return r
   })
 
+  // A compaction changes the context too: redraw the bar and the memory list now, not at the next turn.
   on('session.compact', async ($, e, next) => {
     const r = await next(e)
+    if (!('skip' in r)) await refresh($)
     await recount($)
     return r
   })

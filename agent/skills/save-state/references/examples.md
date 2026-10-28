@@ -1,7 +1,6 @@
 # Save State examples
 
-Use these examples as a pattern. The node should be compact, concrete, and
-honest about what the evidence does and does not prove.
+Use these examples as a pattern. The node should be compact, concrete, and honest about what the evidence does and does not prove.
 
 ## Node shape
 
@@ -102,9 +101,7 @@ transcript_status: archived
 - Next, deploy the fix.
 ```
 
-Why it is bad: it claims completion without acceptance evidence, claims an
-archive without an exported file and verification, and turns a possible next
-step into an authorized action.
+Why it is bad: it claims completion without acceptance evidence, claims an archive without an exported file and verification, and turns a possible next step into an authorized action.
 
 ## Final report shape
 

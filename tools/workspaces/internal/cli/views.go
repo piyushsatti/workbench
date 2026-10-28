@@ -336,8 +336,7 @@ func (a *App) spaceShow(args []string) int {
 		}
 	}
 
-	root := policy.Cwd{Logical: sp.Root.Path, Physical: sp.Root.Path}
-	d := policy.Decide(root, cfg, sp)
+	d := rootDecision(cfg, sp)
 	decision := "refuse"
 	if d.Allow {
 		decision = "allow"
@@ -390,7 +389,7 @@ func (a *App) todoList(args []string) int {
 	groups := map[string][][3]string{}
 	var idW, statusW int
 	for _, r := range recs {
-		g := field(groupOf(r))
+		g := groupOf(r)
 		if _, seen := groups[g]; !seen {
 			order = append(order, g)
 		}
@@ -406,7 +405,7 @@ func (a *App) todoList(args []string) int {
 	// Padded by hand rather than with tabwriter, which restarts its columns
 	// at every header line, so the columns line up across groups.
 	for _, g := range order {
-		fmt.Fprintln(a.Stdout, g)
+		fmt.Fprintln(a.Stdout, field(g))
 		for _, row := range groups[g] {
 			fmt.Fprintf(a.Stdout, "  %s  %s  %s\n", padRight(row[0], idW), padRight(row[1], statusW), row[2])
 		}

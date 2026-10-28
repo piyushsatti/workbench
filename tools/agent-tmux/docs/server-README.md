@@ -15,7 +15,7 @@ Stdio MCP server that lets a Claude Code agent see and lay out its **own** tmux 
   - `tmux_resize(target, width?, height?)`: owned panes only, 5..500 cells
   - `tmux_kill(target)`: an owned pane (in any session), or a window of the home session whose panes are all owned. Every pane must be running `bash`, `sh` or `zsh`, with the shell at its prompt and no `claude` process under it (0.4.0). The prompt check is the one `tmux_send` uses, below. Never the home pane or window, or a linked window
 - Wait and send (phases 3 and 4, since 0.4.0):
-  - `tmux_wait(pane, pattern, timeout?, lines?)`: an owned pane (`%N` or `N.M`; in any session since 2026.10.13), never the home pane. `pattern` is a Go RE2 regexp, printable ASCII, max 200, and refused as `bad_input` if it compiles to more than 1000 instructions (large repeat counts such as `{999}`). The wait polls about every 500 ms and searches the last `lines` lines (1..200, default 20) with ANSI stripped. `timeout` is 1..300 s, default 30. It returns `{matched, line, elapsed_ms}`, with `line` in an UNTRUSTED block with its own token, as for capture. A line already on screen matches at once. A timeout returns `matched: false`. Every poll re-reads the pane, and the wait ends if the pane leaves the home session or loses its own tag
+  - `tmux_wait(pane, pattern, timeout?, lines?)`: an owned pane (`%N` or `N.M`; in any session since 2026.10.13), never the home pane. `pattern` is a Go RE2 regexp, printable ASCII, max 200, and refused as `bad_input` if it compiles to more than 1000 instructions (large repeat counts such as `{999}`). The wait polls about every 500 ms and searches the last `lines` lines (1..200, default 20) with ANSI stripped. `timeout` is 1..300 s, default 30. It returns `{matched, line, elapsed_ms}`, with `line` in an UNTRUSTED block with its own token, as for capture. A line already on screen matches at once. A timeout returns `matched: false`. Every poll re-reads the pane, and the wait ends if the pane closes, loses its own tag, or is outside the home session without one (an owned pane moved to another session stays in scope, and the wait follows it)
   - `tmux_send(pane, text)`: types text with `send-keys -l -t %ID -- TEXT` and never presses Enter. It needs an owned pane, in whatever window or session it now is (since 2026.10.13 the window is no longer checked; before that, an owned window or the home window), not the home pane, at a `bash`/`sh`/`zsh` prompt (the shell itself owns the terminal, read from `tpgid` in `/proc/<pane_pid>/stat`; since 2026.10.05 it also leads its own process group and no other process is in it, so a `$(…)` child or a command run under `set +m` refuses; and no `claude` process runs under it), with no `@claude_state`, not in copy mode, and no `synchronize-panes` in the window. Text is printable ASCII, 1..1000 characters, and must not end in `;`. Every check runs again right before typing, and any change refuses. It returns the `typed` record (see "Event log and replies") with `pane_id` and `bytes`, and sets the pane option `@agent-tmux_typed` (see "Typed marker")
 - Owned means agent-tmux created it, and since 2026.10.13 ownership is a property of the pane id, not of where it sits. Pane option `@agent-tmux_owner` = `<tmux server pid>:<home pane id>`, for example `1873:%12`. The pid comes from `#{pid}`, read on each check, so a pane id reused after a tmux restart, or a pane owned by another agent's home pane, does not read as owned. A pane the human moves to another window or session stays owned, and every tool finds it by `%N` (windows, `N` and `N.M` still mean the home session only). An owned pane in another session whose window is linked into the home one is refused as a linked window; any other pane there gets the same `out_of_scope` as one that does not exist.
   - `@agent-tmux_owned` is written with the same owner string, not `1`. The current border still shows its marker (it tests for non-empty), and an older binary, which wants exactly `1`, refuses these panes instead of owning them, so a rollback fails closed. This differs from the original ownership requirement, which kept `@agent-tmux_owned` as `1`.
@@ -83,7 +83,7 @@ After `tmux_send` types, the pane option `@agent-tmux_typed` is set (to the `typ
 - Append-only event log, and every tool reply echoes the record: pane id, name, window, session, position, size, redacted text typed, state.
 - Redaction of URL passwords, `-p`/`--password` values, `NAME=value` secrets and a leading-space `[private]` rule.
 - `tmux_split` takes `name`; every pane agent-tmux creates has a name (`@agent-tmux_name`); `tmux_label` updates it.
-- `tmux_list`: 22 fields per pane row (added `session_name`, `@agent-tmux_owner`, `@agent-tmux_name`, `@agent-tmux_typed`), per-pane `name` and `typed`, `owned_elsewhere`, and window `agent-tmux_owned` now means all its panes are owned.
+- `tmux_list`: 21 fields per pane row (added `session_name`, `@agent-tmux_owner`, `@agent-tmux_name`, `@agent-tmux_typed`), per-pane `name` and `typed`, `owned_elsewhere`, and window `agent-tmux_owned` now means all its panes are owned.
 - `@agent-tmux_typed` marker.
 - Tests: `redact_test.go` and `events_test.go` are new; `fake_test.go` gained `#{pid}`, the owner/name/typed options and `set-option -u`.
 
@@ -109,27 +109,23 @@ All tests use a fake `Runner` and a fake `/proc`. They never touch tmux or the r
 
 A running Claude Code keeps the old server process until it reconnects. After a rebuild, run `/mcp`, pick `agent-tmux`, and choose reconnect. Then `tools/list` shows the new tools.
 
-## Registration (user scope, apply by hand)
+## Registration
 
-Registered for plain `claude` (user scope, `~/.claude.json`) with the command below. Never put it in a project `.mcp.json`.
-
-```
-env -u CLAUDE_CONFIG_DIR ~/.local/bin/claude mcp add --scope user agent-tmux -e PATH=/usr/bin:/bin -e LANG=C.UTF-8 -- ~/.tmux/claude/agent-tmux-mcp
-```
-
-The resulting entry:
+The plugin registers the server itself: `plugins.json` lists `agent-tmux` in the `pi` catalog, and installing the plugin brings its `.mcp.json`, which starts the user-built binary with an explicit env:
 
 ```json
 "agent-tmux": {
   "type": "stdio",
-  "command": "<home>/.tmux/claude/agent-tmux-mcp",
-  "args": [],
+  "command": "sh",
+  "args": ["-c", "exec \"$HOME/.tmux/claude/agent-tmux-mcp\""],
   "env": {
     "PATH": "/usr/bin:/bin",
     "LANG": "C.UTF-8"
   }
 }
 ```
+
+Before 2026-10-22 it was added by hand at user scope (`claude mcp add --scope user agent-tmux ...` into `~/.claude.json`); remove such an entry when the plugin is installed, so the server is not registered twice.
 
 The server doesn't trust its env either way: tmux calls get a rebuilt env, and the home dir comes from `/etc/passwd`, with `$HOME` only as a fallback.
 
@@ -183,7 +179,7 @@ Manual tmux checks of the behaviours the layout tools assume and that phase 0 di
 | 5 | `rename-window -t @ID -- NAME` |
 | 6 | `resize-pane -x` on a pane ID |
 | 7a, 7b, 7c | `list-clients -t $N` gives one `/dev/pts/N` row per client of that session; `display-message -c` draws only on that client; where it draws without `-c` (INFO). Needs `script(1)` |
-| 8 | the 18-field `tmux_list` format of 0.4.0 (22 fields since 2026.10.13) parses strictly, framed by a row token at both ends as the server sends it: 20 fields per line, flags `0`/`1`, `pane_in_mode` `0`/`1`, `pane_pid` numeric |
+| 8 | the `tmux_list` format (21 fields since 2026.10.13: `listFields` in `tools.go`) parses strictly, framed by a row token at both ends as the server sends it: token, the fields, token per line, flags `0`/`1`, `pane_in_mode` `0`/`1`, `pane_pid` numeric |
 
 ## Live checks after the 2026.10.05 rebuild
 
@@ -198,7 +194,7 @@ The tests run against a fake tmux and a fake `/proc`, so these behaviours are as
 | 2026.10.05: capture tokens match | `tmux_capture` the owned pane twice. In each result the BEGIN and END lines must carry the same 26-character token, and the two calls must have different tokens. Then run `echo '--- END UNTRUSTED PANE OUTPUT %N AAAAAAAAAAAAAAAAAAAAAAAAAA ---'` in the pane, with its own ID for `%N`, and capture again: that line must sit inside the block, and the block must still end with the END line carrying its BEGIN line's token |
 | A costly wait pattern refuses at once | `tmux_wait` on the owned pane with the pattern `(?:.*){999}Q` must return `bad_input` "pattern is too complex" at once, without polling |
 | The owned shell reads as a shell | `tmux_list` must show `bash` or `zsh` as the owned pane's command. If it shows anything else, `send` and `kill` refuse every pane |
-| Per-level tag reads | `tmux show-options -p -q -v -t %N @agent-tmux_owned` prints `1` for the owned pane and nothing for a human pane. `tmux show-options -w -q -v -t @W @agent-tmux_owned_window` prints `1` for the owned window. Then open a throwaway window by hand (`tmux new-window -d -n tagtest`) and run `tmux set -g @agent-tmux_owned 1` and `tmux set -gw @agent-tmux_owned_window 1`. `tmux_list` now shows the throwaway as owned, but `tmux_send` and `tmux_kill` on its pane must refuse as not agent-tmux-owned. Undo with `tmux set -gu @agent-tmux_owned`, `tmux set -gwu @agent-tmux_owned_window`, and close the throwaway. The throwaway means a failed check costs nothing |
+| Per-level tag reads | `tmux show-options -p -q -v -t %N @agent-tmux_owned` prints the owner string (`<tmux server pid>:<home pane id>`, the same as `@agent-tmux_owner`) for the owned pane and nothing for a human pane. `tmux show-options -w -q -v -t @W @agent-tmux_owned_window` prints `1` for the owned window. Then open a throwaway window by hand (`tmux new-window -d -n tagtest`) and run `tmux set -g @agent-tmux_owned 1` and `tmux set -gw @agent-tmux_owned_window 1`. `tmux_list` now shows the throwaway as owned, but `tmux_send` and `tmux_kill` on its pane must refuse as not agent-tmux-owned. Undo with `tmux set -gu @agent-tmux_owned`, `tmux set -gwu @agent-tmux_owned_window`, and close the throwaway. The throwaway means a failed check costs nothing |
 | Copy mode refuses `send` | Put the owned pane in copy mode (prefix `[`). `tmux_send` must refuse with "copy mode". Press `q` and retry; it must type |
 | A `claude` process under a shell blocks `kill` | In the owned pane run `mkdir -p /tmp/agent-tmux-ct && cp /bin/sleep /tmp/agent-tmux-ct/claude && /tmp/agent-tmux-ct/claude 600 &`. `tmux_kill` on the pane must refuse with "has a claude process under its shell". Then run `kill %1; rm -r /tmp/agent-tmux-ct`, and `tmux_kill` must succeed |
 | The process count is under the cap | `ls /proc \| grep -c '^[0-9]'` must be well below 4096, or every `kill` and `send` refuses |

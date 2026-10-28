@@ -55,6 +55,18 @@ func TestRedact(t *testing.T) {
 		{"--user=user:pass", "curl --user=bob:s3cret https://h", "curl --user=bob:*** https://h"},
 		{"authorization token", `curl -H "Authorization: token abc123" h`, `curl -H "Authorization: token ***" h`},
 		{"--bypass is not a password flag", "tool --bypass x", "tool --bypass x"},
+		// From the second audit.
+		{"MYSQL_PWD=", "MYSQL_PWD=hunter2 mysql db", "MYSQL_PWD=*** mysql db"},
+		{"GITHUB_PAT=", "GITHUB_PAT=ghp_abc gh x", "GITHUB_PAT=*** gh x"},
+		{"PASS=", "PASS=hunter2 ./run", "PASS=*** ./run"},
+		{"DB_PASS=", "export DB_PASS=hunter2", "export DB_PASS=***"},
+		{"PWD is the folder, not a secret", "PWD=/tmp OLDPWD=/home ls", "PWD=/tmp OLDPWD=/home ls"},
+		{"x-api-key header", `curl -H "X-Api-Key: abc123" h`, `curl -H "X-Api-Key: ***" h`},
+		{"private-token header", `curl -H 'PRIVATE-TOKEN: glpat-abc' h`, `curl -H 'PRIVATE-TOKEN: ***' h`},
+		{"curl -u :token", "curl -u :ghp_abc123 https://h", "curl -u :*** https://h"},
+		{"--password with an escaped space", `tool --password=a\ b run`, "tool --password=*** run"},
+		{"-p with an escaped space", `mysql -pa\ b db`, "mysql -p*** db"},
+		{"env value with an escaped space", `TOKEN=a\ b run`, "TOKEN=*** run"},
 		// plain text and known over-redaction
 		{"plain", "ls -la /tmp && echo done", "ls -la /tmp && echo done"},
 		{"empty", "", ""},
@@ -74,6 +86,7 @@ func TestRedactIdempotent(t *testing.T) {
 	for _, in := range []string{
 		"git clone https://bob:s3cret@example.com/r.git", "mysql -phunter2", "PASSWORD=a TOKEN=b", "sshpass -p x ssh h",
 		`curl -H "Authorization: Bearer abc123def456"`, "--password hunter2",
+		"MYSQL_PWD=x GITHUB_PAT=y", `curl -H "X-Api-Key: k" -u :t`, `--password=a\ b`,
 	} {
 		once := redact(in)
 		if twice := redact(once); twice != once {

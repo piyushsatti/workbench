@@ -3,6 +3,7 @@ package launchlog
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -46,14 +47,31 @@ func TestAppendConcurrent(t *testing.T) {
 	}
 }
 
+// The write fails on every OS by capping the file size this process may
+// write (RLIMIT_FSIZE) with SIGXFSZ ignored, so write returns EFBIG; macOS
+// has no /dev/full.
 func TestAppendWriteError(t *testing.T) {
-	if f, err := os.OpenFile("/dev/full", os.O_WRONLY|os.O_APPEND, 0); err != nil {
-		t.Skipf("/dev/full not writable here: %v", err)
-	} else {
-		f.Close()
+	path := filepath.Join(t.TempDir(), "launches.jsonl")
+	if err := os.WriteFile(path, nil, 0o600); err != nil {
+		t.Fatal(err)
 	}
-	if err := Append("/dev/full", Record{ID: NewID()}); err == nil {
-		t.Fatal("Append to /dev/full succeeded, want the write error")
+	var old syscall.Rlimit
+	if err := syscall.Getrlimit(syscall.RLIMIT_FSIZE, &old); err != nil {
+		t.Fatal(err)
+	}
+	signal.Ignore(syscall.SIGXFSZ)
+	defer signal.Reset(syscall.SIGXFSZ)
+	capped := old
+	capped.Cur = 1
+	if err := syscall.Setrlimit(syscall.RLIMIT_FSIZE, &capped); err != nil {
+		t.Fatal(err)
+	}
+	err := Append(path, Record{ID: NewID()})
+	if rerr := syscall.Setrlimit(syscall.RLIMIT_FSIZE, &old); rerr != nil {
+		t.Fatal(rerr)
+	}
+	if err == nil {
+		t.Fatal("Append past the file size limit succeeded, want the write error")
 	}
 }
 

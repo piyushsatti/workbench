@@ -3,7 +3,8 @@ return {
   {
     "ahmedkhalf/project.nvim",
     opts = {
-      detection_methods = { "pattern", "lsp" },
+      -- No "lsp": this pin's lsp method calls the deprecated vim.lsp.buf_get_clients().
+      detection_methods = { "pattern" },
       patterns = { ".git", "pyproject.toml", "package.xml", "CMakeLists.txt", "Makefile" },
       show_hidden = false,
       silent_chdir = true,

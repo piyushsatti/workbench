@@ -23,6 +23,11 @@ class ParseTest(unittest.TestCase):
             "position": "append", "body": "Check each claim.",
         })
 
+    def test_inline_comments_are_not_part_of_a_value(self):
+        source = "---\ntitle: Kickoff  # shown in the list\nposition: prepend # before the prompt\ndescription: C# tips\n---\nGo.\n"
+        got = snippets.parse("kickoff", source)
+        self.assertEqual((got["title"], got["position"], got["description"]), ("Kickoff", "prepend", "C# tips"))
+
     def test_no_frontmatter_is_all_body_appended(self):
         self.assertEqual(snippets.parse("plain", "Just this.\n"), {
             "slug": "plain", "title": "plain", "description": "", "position": "append", "body": "Just this.",

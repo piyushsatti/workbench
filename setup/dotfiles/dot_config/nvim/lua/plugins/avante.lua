@@ -1,6 +1,7 @@
 -- avante.nvim: Claude AI sidebar (VS Code Copilot equivalent)
 -- Uses claude-code ACP provider — authenticates via existing Claude Code OAuth session.
--- No separate API key needed. Requires: npx @zed-industries/claude-code-acp (auto-fetched by npx)
+-- No separate API key needed. Runs @agentclientprotocol/claude-agent-acp (the maintained successor
+-- of Zed's deprecated claude-code-acp) through npx at a pinned version; bump it by hand.
 return {
   {
     "yetone/avante.nvim",
@@ -11,7 +12,7 @@ return {
       acp_providers = {
         ["claude-code"] = {
           command = "npx",
-          args = { "@zed-industries/claude-code-acp" },
+          args = { "@agentclientprotocol/claude-agent-acp@0.98.0" },
           env = {
             NODE_NO_WARNINGS = "1",
           },

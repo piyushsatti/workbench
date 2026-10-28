@@ -164,8 +164,8 @@ bind - split-window -v -c "#{pane_current_path}"
 bind c new-window -c "#{pane_current_path}"
 
 {{- if or $linux $linuxFull }}
-# Fuzzy session switcher (prefix S)
-bind S display-popup -E "tmux list-sessions -F '#{session_name}' | fzf --reverse | xargs tmux switch-client -t"
+# Fuzzy session switcher (prefix S); -I{} passes a name with spaces as one argument, -r skips a cancelled pick
+bind S display-popup -E "tmux list-sessions -F '#{session_name}' | fzf --reverse | xargs -r -I{} tmux switch-client -t {}"
 {{- end }}
 
 # Floating scratch terminal (Alt-g) - toggleable via tmux-toggle-popup

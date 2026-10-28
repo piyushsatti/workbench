@@ -50,6 +50,10 @@ class DriftCheckTests(unittest.TestCase):
                 with mock.patch.object(MODULE, "CHECKS", checks), redirect_stdout(StringIO()) as out:
                     self.assertEqual(MODULE.main([]), 0)
                 self.assertIn("no drift", out.getvalue())
+                drifted = [*checks, ("drifted", lambda: ("drift", ["~/.tmux.conf differs"]))]
+                with mock.patch.object(MODULE, "CHECKS", drifted), redirect_stdout(StringIO()) as out:
+                    self.assertEqual(MODULE.main([]), 1)
+                self.assertIn("~/.tmux.conf differs", out.getvalue())
                 checks.append(("broken", lambda: 1 / 0))
                 with mock.patch.object(MODULE, "CHECKS", checks), redirect_stdout(StringIO()) as out:
                     self.assertEqual(MODULE.main([]), 1)

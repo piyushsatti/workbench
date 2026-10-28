@@ -23,20 +23,25 @@ var (
 
 	// --password VALUE, --password=VALUE and the same with a dashed prefix (--access-token, --auth-token,
 	// --client-secret), in any case. A value may not start with '-', so "--pass -x" keeps the flag that follows.
-	reSecretLongFlag = regexp.MustCompile(`(?i)(^|\s)(--(?:[A-Za-z0-9]+-)*(?:password|passwd|pass|token|secret|api-key|apikey)(?:=|\s+))("[^"]*"|'[^']*'|[^\s-]\S*)`)
+	// An unquoted value runs on through backslash-escaped spaces (a\ b), as the shell reads it.
+	reSecretLongFlag = regexp.MustCompile(`(?i)(^|\s)(--(?:[A-Za-z0-9]+-)*(?:password|passwd|pass|token|secret|api-key|apikey)(?:=|\s+))("[^"]*"|'[^']*'|[^\s\\-](?:\\.|[^\s\\])*)`)
 
-	// curl -u user:pass, --user user:pass and --user=user:pass: the part after the first ':'.
-	reUserPass = regexp.MustCompile(`(^|\s)(-u\s*|--user(?:=|\s+))(["']?)([^\s:'"]+):[^\s'"]+`)
+	// curl -u user:pass, -u :token, --user user:pass and --user=user:pass: the part after the first ':'.
+	reUserPass = regexp.MustCompile(`(^|\s)(-u\s*|--user(?:=|\s+))(["']?)([^\s:'"]*):[^\s'"]+`)
 
 	// Authorization: <scheme> <credentials> in a header, whatever the scheme (token, Basic, Bearer).
 	reAuthHeader = regexp.MustCompile(`(?i)(authorization:\s*[A-Za-z]+\s+)[^\s'"]+`)
 
+	// Headers whose whole value is the key: X-Api-Key, Api-Key, X-Auth-Token, PRIVATE-TOKEN (GitLab).
+	reKeyHeader = regexp.MustCompile(`(?i)\b((?:x-)?(?:api-key|auth-token)|private-token)(:\s*)[^\s'"]+`)
+
 	// -p VALUE, -p=VALUE and -pVALUE (mysql style), lower case only: -P is a port in ssh, scp and mysql. This also
 	// hits "mkdir -p dir" and "docker run -p 8080:80", which is accepted over-redaction.
-	reSecretShortFlag = regexp.MustCompile(`(^|\s)(-p(?:=|\s*))("[^"]*"|'[^']*'|[^\s-]\S*)`)
+	reSecretShortFlag = regexp.MustCompile(`(^|\s)(-p(?:=|\s*))("[^"]*"|'[^']*'|[^\s\\-](?:\\.|[^\s\\])*)`)
 
-	// NAME=value where NAME ends in PASSWORD, TOKEN, SECRET or KEY in any case. A quoted value may hold spaces.
-	reSecretEnv = regexp.MustCompile(`(?i)\b([A-Za-z0-9_]*(?:PASSWORD|TOKEN|SECRET|KEY))=("[^"]*"|'[^']*'|\S+)`)
+	// NAME=value where NAME ends in PASSWORD, PASSWD, PASS, PWD, PAT, TOKEN, SECRET or KEY in any case
+	// (MYSQL_PWD, GITHUB_PAT). A quoted value may hold spaces. PWD and OLDPWD themselves are folders, kept.
+	reSecretEnv = regexp.MustCompile(`(?i)\b([A-Za-z0-9_]*(?:PASSWORD|PASSWD|PASS|PWD|PAT|TOKEN|SECRET|KEY))=("[^"]*"|'[^']*'|(?:\\.|[^\s\\])+)`)
 
 	reBearer = regexp.MustCompile(`(?i)\b(bearer\s+)[A-Za-z0-9._~+/=-]{6,}`)
 )
@@ -48,8 +53,15 @@ func redact(s string) string {
 	s = reSecretLongFlag.ReplaceAllString(s, "${1}${2}***")
 	s = reUserPass.ReplaceAllString(s, "${1}${2}${3}${4}:***")
 	s = reAuthHeader.ReplaceAllString(s, "${1}***")
+	s = reKeyHeader.ReplaceAllString(s, "${1}${2}***")
 	s = reSecretShortFlag.ReplaceAllString(s, "${1}${2}***")
-	s = reSecretEnv.ReplaceAllString(s, "${1}=***")
+	s = reSecretEnv.ReplaceAllStringFunc(s, func(m string) string {
+		name := m[:strings.IndexByte(m, '=')]
+		if u := strings.ToUpper(name); u == "PWD" || u == "OLDPWD" {
+			return m
+		}
+		return name + "=***"
+	})
 	return reBearer.ReplaceAllString(s, "${1}***")
 }
 

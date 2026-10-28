@@ -129,9 +129,7 @@ func (a *App) checkSpaceRoots(cfg *config.Spaces) doctorRow {
 	var bad []string
 	for _, name := range cfg.SpaceNames() {
 		sp := cfg.Spaces[name]
-		root := policy.Cwd{Logical: sp.Root.Path, Physical: sp.Root.Path}
-		// attach_denied is the attach paths' check, reported on its own row.
-		if d := policy.Decide(root, cfg, sp); !d.Allow && d.Reason != policy.ReasonAttachDenied {
+		if d := rootDecision(cfg, sp); !d.Allow {
 			bad = append(bad, name+": "+reasonRule(d))
 		}
 	}
@@ -139,6 +137,16 @@ func (a *App) checkSpaceRoots(cfg *config.Spaces) doctorRow {
 		return doctorRow{levelFail, "space roots", strings.Join(bad, "; ")}
 	}
 	return doctorRow{levelOK, "space roots", plural(len(cfg.Spaces), "space") + " pass the launch check"}
+}
+
+// rootDecision is the launch check of a space's root alone. Decide tests attach
+// paths before allow_launch, so it runs on a copy without them: a denied attach
+// path, reported on its own row, must not hide a refused root.
+func rootDecision(cfg *config.Spaces, sp *config.Space) policy.Decision {
+	bare := *sp
+	bare.Attach = nil
+	root := policy.Cwd{Logical: sp.Root.Path, Physical: sp.Root.Path}
+	return policy.Decide(root, cfg, &bare)
 }
 
 func (a *App) checkAttach(cfg *config.Spaces) doctorRow {
@@ -204,7 +212,8 @@ func (a *App) checkConfigDirs(hs *config.Harnesses) doctorRow {
 }
 
 // checkWrappers wants a bash function per harness that calls workspaces run with
-// the harness's name, in ~/.bash_aliases.
+// the harness's name, in ~/.bash_aliases: "name() {", "function name {" or
+// "function name() {", with a body that may span lines.
 func (a *App) checkWrappers(hs *config.Harnesses) doctorRow {
 	path := filepath.Join(a.home(), ".bash_aliases")
 	data, err := os.ReadFile(path)
@@ -213,7 +222,8 @@ func (a *App) checkWrappers(hs *config.Harnesses) doctorRow {
 	}
 	var missing []string
 	for _, name := range hs.Names() {
-		re := regexp.MustCompile(`(?m)^\s*` + regexp.QuoteMeta(name) + `\s*\(\)\s*\{[^}\n]*\b(?:workspaces|awm) run \. ` + regexp.QuoteMeta(name) + `(\s|;|$)`)
+		q := regexp.QuoteMeta(name)
+		re := regexp.MustCompile(`(?m)^[ \t]*(?:function[ \t]+` + q + `[ \t]*(?:\(\)[ \t]*)?|` + q + `[ \t]*\(\)[ \t]*)\{[^}]*\b(?:workspaces|awm) run \. ` + q + `(\s|;|$)`)
 		if !re.Match(data) {
 			missing = append(missing, name)
 		}
@@ -384,7 +394,14 @@ func (a *App) checkTmux() doctorRow {
 	out, err := a.Tmux(tmux.ListSessions())
 	switch {
 	case err == nil:
-		return doctorRow{levelOK, "tmux", fmt.Sprintf("%s; server answers, %s", path, plural(len(strings.Fields(out)), "session"))}
+		// One session per line; a session name may hold spaces.
+		n := 0
+		for _, line := range strings.Split(out, "\n") {
+			if strings.TrimSpace(line) != "" {
+				n++
+			}
+		}
+		return doctorRow{levelOK, "tmux", fmt.Sprintf("%s; server answers, %s", path, plural(n, "session"))}
 	case a.Getenv("TMUX") != "":
 		return doctorRow{levelFail, "tmux", "$TMUX is set but the server does not answer, so launches are refused: " + err.Error()}
 	case tmux.IsNoServer(err):

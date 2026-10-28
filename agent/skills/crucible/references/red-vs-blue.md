@@ -69,9 +69,7 @@ The user's call is final. The gate **informs, never blocks** — if they say go,
 
 ## Output contracts
 
-Both open with `## Analysis` (free prose) before any structured section — reasoning
-first, structure last [D14]. Severity is the shared taxonomy from
-`references/wardrobe/hats/HATS.md`.
+Both open with `## Analysis` (free prose) before any structured section — reasoning first, structure last [D14]. Severity is the shared taxonomy from `references/wardrobe/hats/HATS.md`.
 
 ```markdown
 # Red team: [subject]

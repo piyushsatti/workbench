@@ -30,7 +30,8 @@ fi
 
 # tmux expands this output once more, so a # in a folder or branch name is doubled to show as itself.
 line="#[fg={{ $t.accent }},bold]${folder//\#/##}#[nobold]"
-info=$(git -C "$cwd" --no-optional-locks rev-parse --abbrev-ref HEAD --git-dir --git-common-dir 2>/dev/null)
+# Both dirs absolute: in a subfolder --git-dir is absolute but --git-common-dir is relative, so they never match.
+info=$(git -C "$cwd" --no-optional-locks rev-parse --abbrev-ref HEAD --path-format=absolute --git-dir --git-common-dir 2>/dev/null)
 if [ -n "$info" ]; then
   { read -r branch; read -r gitdir; read -r commondir; } <<< "$info"
   prefix=" "

@@ -957,6 +957,12 @@ func TestRunInternalErrorsExit70(t *testing.T) {
 	}{
 		{"getwd fails", func(f *fixture) { f.getwdErr = errors.New("gone") }, []string{".", "claude"}, 0, false},
 		{"chdir fails", func(f *fixture) { f.inTmux("999"); f.chdirErr = errors.New("gone") }, []string{"a", "claude"}, 0, true},
+		{"space root is gone, nothing logged", func(f *fixture) {
+			f.inTmux("999")
+			if err := os.RemoveAll(filepath.Join(f.home, "Source/Projects/a")); err != nil {
+				t.Fatal(err)
+			}
+		}, []string{"a", "claude"}, 0, false},
 		{"exec fails", func(f *fixture) { f.inTmux("999"); f.execErr = errors.New("ENOEXEC") }, []string{".", "claude"}, 1, true},
 		{"cwd does not resolve", func(f *fixture) { f.cwd = filepath.Join(f.home, "deleted") }, []string{".", "claude"}, 0, false},
 		{"executable unknown", func(f *fixture) { f.executableErr = errors.New("no /proc") }, []string{".", "claude"}, 0, false},

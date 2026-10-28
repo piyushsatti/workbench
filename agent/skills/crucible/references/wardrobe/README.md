@@ -1,34 +1,19 @@
 # Wardrobe — the shared hat library
 
-The wardrobe is a **reference library, not a workflow.** It holds one file per
-professional lens (`hats/<name>.md`). Those files are the single source of truth
-for what each lens cares about; the review modes *consume* them.
+The wardrobe is a **reference library, not a workflow.** It holds one file per professional lens (`hats/<name>.md`). Those files are the single source of truth for what each lens cares about; the review modes *consume* them.
 
 - **consult** loads exactly one hat → partner-stance dialogue through that lens.
 - **hats** loads 3–4 distinct hats → parallel blind panel, each hat + neutral stance.
 - **red-vs-blue** optionally loads one hat → both red and blue wear the same lens.
 
-Defining a persona once here and composing it everywhere is the whole point: the
-architect lens is never re-described in three modes that can drift apart. A hat
-file carries *what to look at*; each consumer supplies *how to engage* (its own
-stance protocol). Red-vs-blue "wearing a hat" is the same mechanism — the stance
-role reads the lens file into its prompt; no nested subagents.
+Defining a persona once here and composing it everywhere is the whole point: the architect lens is never re-described in three modes that can drift apart. A hat file carries *what to look at*; each consumer supplies *how to engage* (its own stance protocol). Red-vs-blue "wearing a hat" is the same mechanism — the stance role reads the lens file into its prompt; no nested subagents.
 
 ## How a consumer loads a hat
 
 1. Resolve the roster (below) or ask the user which lens fits.
-2. Read `references/wardrobe/hats/<name>.md` (paths are relative to the crucible
-   skill folder).
-3. Compose: the hat file's **body** (the `## Role` … `## Severity anchors`
-   sections) + the consumer's own stance rules → the dispatch prompt (or the
-   in-thread persona for consult). **Exclude the YAML frontmatter** — `overlaps`
-   is registry metadata for the panel composer and the overlap eval; naming other
-   hats in the payload is irrelevant detail and measured downside, so it never
-   reaches the reviewing model [D16, D13]. The shared severity taxonomy lives in
-   `references/wardrobe/hats/HATS.md`, not in each hat — a consumer that needs the
-   level definitions reads them from there.
-4. If no roster hat fits, draft one inline for the run **and flag it for wardrobe
-   addition** — do not silently invent a throwaway lens.
+2. Read `references/wardrobe/hats/<name>.md` (paths are relative to the crucible skill folder).
+3. Compose: the hat file's **body** (the `## Role` … `## Severity anchors` sections) + the consumer's own stance rules → the dispatch prompt (or the in-thread persona for consult). **Exclude the YAML frontmatter** — `overlaps` is registry metadata for the panel composer and the overlap eval; naming other hats in the payload is irrelevant detail and measured downside, so it never reaches the reviewing model [D16, D13]. The shared severity taxonomy lives in `references/wardrobe/hats/HATS.md`, not in each hat — a consumer that needs the level definitions reads them from there.
+4. If no roster hat fits, draft one inline for the run **and flag it for wardrobe addition** — do not silently invent a throwaway lens.
 
 ## Roster (v1)
 
@@ -56,14 +41,9 @@ role reads the lens file into its prompt; no nested subagents.
 
 ## Authoring or extending a hat
 
-The authoring contract (frontmatter + the six body sections), the shared severity
-taxonomy, the anti-flavor rule, the minting rule (a new hat must **declare** a
-failure class no existing hat lists — uniqueness is then verified by the overlap
-eval, not assumed — else extend an existing hat), and the versioning note all live
-in `references/wardrobe/hats/HATS.md`. Read it before adding or editing any hat.
+The authoring contract (frontmatter + the six body sections), the shared severity taxonomy, the anti-flavor rule, the minting rule (a new hat must **declare** a failure class no existing hat lists — uniqueness is then verified by the overlap eval, not assumed — else extend an existing hat), and the versioning note all live in `references/wardrobe/hats/HATS.md`. Read it before adding or editing any hat.
 
-The D-numbers cited throughout are in
-`references/wardrobe/adversarial-review-methodology.md`.
+The D-numbers cited throughout are in `references/wardrobe/adversarial-review-methodology.md`.
 
 ## Not a workflow
 Nothing here is invoked directly. If you want to *use* a lens:
@@ -72,7 +52,4 @@ Nothing here is invoked directly. If you want to *use* a lens:
 - adversarial attack/verify → **red-vs-blue**
 
 ## Status
-Hat files are **v1** (`status: v1` in each file's frontmatter), rebuilt to the
-persona/contract research findings (D12–D17). Rubrics and failure classes are
-expected to be revised after real review batches [D15] — bump `status` and re-run
-the hat evals when a definition changes.
+Hat files are **v1** (`status: v1` in each file's frontmatter), rebuilt to the persona/contract research findings (D12–D17). Rubrics and failure classes are expected to be revised after real review batches [D15] — bump `status` and run the overlap eval by hand (`hats/HATS.md`, Running the evals) when a definition changes.

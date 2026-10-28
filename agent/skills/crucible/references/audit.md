@@ -11,7 +11,7 @@ Do not edit files, run fixes, or start implementation. Findings only. Route fixe
 ## Before dispatch
 
 1. Confirm **scope** — files, docs, plan, PR, or intent statement. If unclear, ask.
-2. Ask the user **which model** to use for the auditor subagent (or review in-session if they prefer). Do not assume a tier.
+2. Pick the auditor's **model** as the delegation rulebook routes judgement work: set Sonnet class or Opus class on the auditor subagent, tell the user which, and let them override it (or review in-session if they prefer).
 3. Optional: ask for a **persona** (strict auditor, SRE, security, domain expert). Default: neutral independent reviewer.
 
 ## Auditor instructions

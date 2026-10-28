@@ -141,15 +141,16 @@ func (a *App) spaceDetach(args []string) int {
 			}
 			pathArg = choice
 		}
-		e, ok := a.findEntry(sp.Attach, pathArg)
-		if !ok {
+		found := a.findEntries(sp.Attach, pathArg)
+		if len(found) == 0 {
 			return "", a.fail(exitUsage, "%s is not attached to space %s", pathArg, sp.Name)
 		}
+		e := found[0]
 		if code := a.confirm(*yes, fmt.Sprintf("Detach %s from space %s?", e.Written, sp.Name)); code != exitOK {
 			return "", code
 		}
 		return a.editSpaceList(top, sp.Name, "attach", func(list jsonedit.Array) (jsonedit.Array, int) {
-			return list.Without(list.Index(e.Written)), exitOK
+			return list.WithoutStrings(writtenForms(found)), exitOK
 		}, "detached "+e.Written+" from space "+sp.Name)
 	})
 }

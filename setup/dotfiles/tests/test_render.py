@@ -30,6 +30,7 @@ NVIM_FILES = {
     ".config/nvim/lua/plugins/colorscheme.lua",
     ".config/nvim/lua/plugins/mason-extra.lua",
     ".config/nvim/lua/plugins/project.lua",
+    ".config/nvim/lua/plugins/tmux-navigator.lua",
 }
 # Pinned copy of catppuccin/btop themes/catppuccin_mocha.theme (see dot_config/btop/themes/.catppuccin-SOURCE).
 CATPPUCCIN_BTOP_SHA256 = "4c7469ab9bda282c1ff606aca37c9c0b84cd0cb66d041e4e7e1fed39791f4644"
@@ -223,9 +224,14 @@ class RenderTests(unittest.TestCase):
                 self.assertIn(plugin, lua)
                 self.assertIn(colorscheme, lua)
             json.loads(files[".config/nvim/lazy-lock.json"])
-            if LUAC:
-                for name in NVIM_FILES - {".config/nvim/lazy-lock.json"}:
-                    subprocess.run([LUAC, "-p", "-"], input=files[name], check=True)
+
+    def test_nvim_lua_parses_under_both_themes(self):
+        if not LUAC:
+            self.skipTest("luac is required to parse the nvim Lua files")
+        for theme in ("nord", "catppuccin-mocha"):
+            files = self.render_data({"chezmoi": {"os": "linux"}, "workstation": {"profile": "linux"}, "theme": theme})
+            for name in NVIM_FILES - {".config/nvim/lazy-lock.json"}:
+                subprocess.run([LUAC, "-p", "-"], input=files[name], check=True)
 
     def test_btop_picks_the_catppuccin_theme_file(self):
         nord = self.render_data({"chezmoi": {"os": "linux"}})
@@ -292,6 +298,71 @@ class RenderTests(unittest.TestCase):
         self.assertIn("macos-titlebar-style = tabs", darwin_ghostty)
         self.assertIn("macos-option-as-alt = true", darwin_ghostty)
 
+    def test_session_switcher_passes_a_name_with_spaces_whole(self):
+        tmux = self.render("linux", "linux-full")[0][".tmux.conf"].decode()
+        command = re.search(r'^bind S display-popup -E "(.*)"$', tmux, re.MULTILINE).group(1)
+        with tempfile.TemporaryDirectory(prefix="dotfiles-switch-") as temp:
+            bin_dir, calls = Path(temp), Path(temp) / "calls"
+            (bin_dir / "fzf").write_text('#!/bin/sh\nhead -n 1\n')
+            (bin_dir / "tmux").write_text(
+                '#!/bin/sh\nif [ "$1" = list-sessions ]; then printf "%s" "$SESSIONS"; exit; fi\n'
+                'printf "%s|" "$@" >> "$CALLS"; echo >> "$CALLS"\n')
+            for name in ("fzf", "tmux"):
+                (bin_dir / name).chmod(0o755)
+            for sessions, want in (("my work\nmain\n", "switch-client|-t|my work|\n"), ("", None)):
+                calls.unlink(missing_ok=True)
+                subprocess.run(["sh", "-c", command], check=True,
+                               env={"PATH": f"{bin_dir}:/usr/bin:/bin", "SESSIONS": sessions, "CALLS": str(calls)})
+                self.assertEqual(calls.read_text() if calls.exists() else None, want, repr(sessions))
+
+    def test_pane_title_marks_only_a_linked_worktree(self):
+        files, _ = self.render("linux")
+        with tempfile.TemporaryDirectory(prefix="dotfiles-pane-") as temp:
+            root = Path(temp).resolve()
+            script = root / "pane-title.sh"
+            script.write_bytes(files[".tmux/claude/pane-title.sh"])
+            repo, linked = root / "repo", root / "linked"
+            # No user or system config: a global hooks path or signing setting would refuse the commit.
+            env = {"HOME": temp, "PATH": "/usr/bin:/bin", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1"}
+            git = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "init.defaultBranch=main"]
+            subprocess.run([*git, "init", "-q", str(repo)], env=env, check=True)
+            (repo / "sub/deeper").mkdir(parents=True)
+            subprocess.run([*git, "-C", str(repo), "commit", "-q", "--allow-empty", "-m", "x"], env=env, check=True)
+            subprocess.run([*git, "-C", str(repo), "worktree", "add", "-q", "-b", "side", str(linked)], env=env, check=True)
+            (linked / "sub").mkdir()
+
+            def title(cwd):
+                return subprocess.run(["bash", str(script), str(cwd)], env=env,
+                                      check=True, capture_output=True, text=True).stdout
+
+            for cwd in (repo, repo / "sub", repo / "sub/deeper"):
+                self.assertNotIn("wt:", title(cwd), cwd)
+            for cwd in (linked, linked / "sub"):
+                self.assertIn("wt:side", title(cwd), cwd)
+
+    def login_shell(self, os_name, home_files):
+        """What a non-interactive login bash prints for $FROM, with the rendered .bash_profile in HOME."""
+        files, _ = self.render(os_name)
+        with tempfile.TemporaryDirectory(prefix="dotfiles-login-") as temp:
+            (Path(temp) / ".bash_profile").write_bytes(files[".bash_profile"])
+            for name, body in home_files.items():
+                (Path(temp) / name).write_text(body)
+            return subprocess.run(
+                ["bash", "--login", "-c", 'echo "$FROM"'],
+                env={"HOME": temp, "PATH": "/usr/bin:/bin"},
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+
+    def test_linux_login_shell_runs_profile_then_falls_back_to_bashrc(self):
+        # bash reads only the first of .bash_profile, .bash_login and .profile, so the managed
+        # .bash_profile has to run Ubuntu's .profile (~/.local/bin, rustup's env) itself.
+        both = {".profile": "FROM=profile\n", ".bashrc": "FROM=bashrc\n"}
+        self.assertEqual(self.login_shell("linux", both), "profile")
+        self.assertEqual(self.login_shell("linux", {".bashrc": "FROM=bashrc\n"}), "bashrc")
+        self.assertEqual(self.login_shell("darwin", both), "bashrc")
+
     def test_existing_pyenv_function_does_not_recreate_lazy_wrappers(self):
         files, _ = self.render("linux")
         with tempfile.TemporaryDirectory(prefix="dotfiles-bash-") as temp:
@@ -355,6 +426,37 @@ class SourceTests(unittest.TestCase):
             self.assertNotEqual(path.suffix, ".log", rel)
             if path.stat().st_size == 0:
                 self.assertRegex(path.name, r"^(?:(?:private|readonly|executable|encrypted)_)*empty_", rel)
+
+    def test_ctrl_hjkl_cross_into_tmux_panes_from_nvim(self):
+        # tmux loads christoomey/vim-tmux-navigator; nvim needs the same plugin, not plain <C-w> maps, or
+        # Ctrl+h/j/k/l stop at the edge of nvim.
+        nvim = ROOT / "dot_config/nvim"
+        keymaps = (nvim / "lua/config/keymaps.lua").read_text()
+        for key in ("<C-h>", "<C-j>", "<C-k>", "<C-l>"):
+            self.assertNotIn(f'"{key}"', keymaps)
+        spec = (nvim / "lua/plugins/tmux-navigator.lua").read_text()
+        self.assertIn('"christoomey/vim-tmux-navigator"', spec)
+        self.assertRegex(json.loads((nvim / "lazy-lock.json").read_text())["vim-tmux-navigator"]["commit"], r"^[0-9a-f]{40}$")
+
+    def test_project_nvim_skips_lsp_detection(self):
+        # The pinned project.nvim's lsp method calls vim.lsp.buf_get_clients(), deprecated and warning on every
+        # buffer in current Neovim; pattern detection alone finds the same roots.
+        lua = (ROOT / "dot_config/nvim/lua/plugins/project.lua").read_text()
+        methods = re.search(r"detection_methods\s*=\s*\{([^}]*)\}", lua).group(1)
+        self.assertEqual(re.findall(r'"(\w+)"', methods), ["pattern"])
+
+    def test_both_colorschemes_are_pinned(self):
+        # colorscheme.lua.tmpl names nordtheme/vim as "nord" and catppuccin/nvim as "catppuccin"; lazy.nvim keys
+        # its lock by that name, so an entry missing here leaves the theme unpinned.
+        lock = json.loads((ROOT / "dot_config/nvim/lazy-lock.json").read_text())
+        for name in ("nord", "catppuccin"):
+            self.assertRegex(lock.get(name, {}).get("commit", ""), r"^[0-9a-f]{40}$", name)
+
+    def test_avante_runs_the_maintained_acp_adapter_at_a_pinned_version(self):
+        # @zed-industries/claude-code-acp is deprecated in favour of @agentclientprotocol/claude-agent-acp.
+        lua = (ROOT / "dot_config/nvim/lua/plugins/avante.lua").read_text()
+        self.assertNotIn("@zed-industries/claude-code-acp", lua)
+        self.assertRegex(lua, r'"@agentclientprotocol/claude-agent-acp@\d+\.\d+\.\d+"')
 
 
 if __name__ == "__main__":

@@ -71,6 +71,35 @@ class CliTests(unittest.TestCase):
         self.assertTrue((self.home / ".local/bin/claude").is_symlink())
         self.assertEqual(len(MODULE.REPORT["kept"]), 5)
 
+    def test_missing_chezmoi_is_checked_against_the_pinned_checksum_only(self):
+        downloads = []
+
+        def download(url, target, checksum=None):
+            downloads.append((url, checksum))
+            raise RuntimeError("stop before extracting")
+
+        with (
+            mock.patch.object(MODULE, "download", side_effect=download),
+            mock.patch.object(MODULE.os, "uname", return_value=mock.Mock(machine="aarch64")),
+            self.assertRaisesRegex(RuntimeError, "stop before extracting"),
+        ):
+            MODULE.chezmoi_tool()
+        version = MODULE.VERSIONS["chezmoi"]
+        self.assertEqual(downloads, [(
+            f"https://github.com/twpayne/chezmoi/releases/download/v{version}/chezmoi_{version}_linux_arm64.tar.gz",
+            MODULE.VERSIONS["chezmoiSha256"]["arm64"],
+        )])
+
+    def test_chezmoi_pins_every_architecture_and_refuses_an_unknown_one(self):
+        self.assertEqual(set(MODULE.VERSIONS["chezmoiSha256"]), {"amd64", "arm64"})
+        for digest in MODULE.VERSIONS["chezmoiSha256"].values():
+            self.assertRegex(digest, r"^[0-9a-f]{64}$")
+        with (
+            mock.patch.object(MODULE.os, "uname", return_value=mock.Mock(machine="riscv64")),
+            self.assertRaisesRegex(RuntimeError, "no pinned chezmoi for riscv64"),
+        ):
+            MODULE.chezmoi_tool()
+
     def test_only_missing_agent_clis_get_the_latest(self):
         self.installed("claude")
         with mock.patch.object(MODULE, "write") as write:

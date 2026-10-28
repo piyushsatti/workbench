@@ -10,11 +10,7 @@ A review returns three things in this order, and nothing else:
 2. a `findings:` block,
 3. a `## RAISE` section, only when there is something to raise.
 
-Prose before the `pass:` line is required to carry the `checks run:` block described under "Standing checks", and is otherwise worth writing: the strongest
-observed rounds opened by saying what the reviewer actually did, which gates
-they reproduced themselves rather than took on trust, and what they could not
-execute. A reviewer that cannot say where it read a fact marks that finding
-unverified on its face.
+Prose before the `pass:` line is required to carry the `checks run:` block described under "Standing checks", and is otherwise worth writing: the strongest observed rounds opened by saying what the reviewer actually did, which gates they reproduced themselves rather than took on trust, and what they could not execute. A reviewer that cannot say where it read a fact marks that finding unverified on its face.
 
 ### The pass line
 
@@ -22,9 +18,7 @@ unverified on its face.
 pass: true
 ```
 
-`true` or `false`, lowercase, nothing else. `pass: false` whenever there is at
-least one `defect`. A `plan conflict` alone does not fail a review, because it
-is not the author's to fix; it is routed instead.
+`true` or `false`, lowercase, nothing else. `pass: false` whenever there is at least one `defect`. A `plan conflict` alone does not fail a review, because it is not the author's to fix; it is routed instead.
 
 ### The findings block
 
@@ -34,93 +28,55 @@ One finding per line, five fields, separated by ` | `:
 <path>:<line> | <rulebook-ref> | <type> | <subtype> | <text>
 ```
 
-- **`<path>:<line>`** — the file and line the finding anchors to. A range
-  (`:297-320`) is allowed. A finding about something a document should say and
-  does not is anchored to the document with `(silent)` in place of the line.
-- **`<rulebook-ref>`** — the rulebook and heading the finding cites, as
-  `` `code-quality.md` § Shape ``. This field is what makes a finding
-  actionable, so it is never blank and never a bare filename: the heading is
-  the part a fixer reads before changing code.
+- **`<path>:<line>`** — the file and line the finding anchors to. A range (`:297-320`) is allowed. A finding about something a document should say and does not is anchored to the document with `(silent)` in place of the line.
+- **`<rulebook-ref>`** — the rulebook and heading the finding cites, as `` `code-quality.md` § Shape ``. This field is what makes a finding actionable, so it is never blank and never a bare filename: the heading is the part a fixer reads before changing code.
 - **`<type>`** — `defect`, `plan conflict`, or `nit`. See below.
 - **`<subtype>`** — `rule` or `judgement`. See below.
-- **`<text>`** — one paragraph, stating the defect and why the cited rule makes
-  it one. Concrete over categorical: name the input, the state, and what goes
-  wrong.
+- **`<text>`** — one paragraph, stating the defect and why the cited rule makes it one. Concrete over categorical: name the input, the state, and what goes wrong.
 
 ### Types
 
-- **`defect`** — the code breaches a named rule. The author fixes it without
-  asking. This is the overwhelming majority of findings.
-- **`plan conflict`** — the only fix would change a signed contract (a plan's
-  `## Signatures` section, a binding amendment, a ratified schema), or two
-  binding documents prescribe different things and the code cannot satisfy
-  both. **Reserved for a human.** See below.
+- **`defect`** — the code breaches a named rule. The author fixes it without asking. This is the overwhelming majority of findings.
+- **`plan conflict`** — the only fix would change a signed contract (a plan's `## Signatures` section, a binding amendment, a ratified schema), or two binding documents prescribe different things and the code cannot satisfy both. **Reserved for a human.** See below.
 - **`nit`** — a real but trivial breach. Report it; never let it fail a review.
 
 ### Subtypes
 
 - **`rule`** — a named rulebook heading says so, and the finding quotes it.
-- **`judgement`** — no named rulebook covers the point, so the reviewer applied
-  its own judgement. A `judgement` finding must say so in its text and must
-  also be raised under `## RAISE`, because a rule needed for a finding that
-  exists nowhere in the named rulebooks is a gap in the rulebooks.
+- **`judgement`** — no named rulebook covers the point, so the reviewer applied its own judgement. A `judgement` finding must say so in its text and must also be raised under `## RAISE`, because a rule needed for a finding that exists nowhere in the named rulebooks is a gap in the rulebooks.
 
 ## Reserved for a human
 
-**A `plan conflict` is never fixed by an agent.** A fixing agent skips every one
-of them and records `not fixed: plan conflict <file>:<line>`; the calling
-session routes it for a ruling, and the ruling is written to
-the project's decision record before any code changes.
+**A `plan conflict` is never fixed by an agent.** A fixing agent skips every one of them and records `not fixed: plan conflict <file>:<line>`; the calling session routes it for a ruling, and the ruling is written to the project's decision record before any code changes.
 
-The reason is the whole point of the type: the fix would change what was
-signed, so applying it silently converts a decision someone owns into a change
-nobody reviewed. The observed practice is to raise these *before* code review
-where they are already known, so a reviewer does not spend a round
-rediscovering them as signature drift.
+The reason is the whole point of the type: the fix would change what was signed, so applying it silently converts a decision someone owns into a change nobody reviewed. The observed practice is to raise these *before* code review where they are already known, so a reviewer does not spend a round rediscovering them as signature drift.
 
-Everything else — `defect` and `nit` — is the author's or the fixing agent's to
-apply, in the order given.
+Everything else — `defect` and `nit` — is the author's or the fixing agent's to apply, in the order given.
 
 ## The RAISE section
 
-Headed `## RAISE`, at the end, present only when it has content. It carries
-what the reviewer could not settle inside its own scope:
+Headed `## RAISE`, at the end, present only when it has content. It carries what the reviewer could not settle inside its own scope:
 
 - two rulebooks contradicting each other on a point, quoting both;
 - a rule needed for a finding that exists nowhere in the named rulebooks;
 - the target contradicting a decisions document the caller named;
-- symbol tooling unavailable for a file type, so textual search was used:
-  `symbol tooling unavailable for <ext>; textual search used`.
+- symbol tooling unavailable for a file type, so textual search was used: `symbol tooling unavailable for <ext>; textual search used`.
 
-A RAISE never blocks the review. The reviewer files what it can and raises the
-rest.
+A RAISE never blocks the review. The reviewer files what it can and raises the rest.
 
 ## Rounds
 
-Work runs as a loop of plan, implement and review, at most **two** rounds,
-with no signature stage. Round two plans from round one's findings, implements, and is reviewed
-again. A second round that still does not pass ends the loop rather than opening
-a third: something upstream is wrong, and the caller takes it to the human.
-Reopening is a ruling, and the failing rounds stay in the record as history
-rather than being erased. A ruling to reopen names what went wrong to reach the
-cap (which brief, rule or agent let the defects through), and the caller records
-it in the project's log before the next round.
+Work runs as a loop of plan, implement and review, at most **two** rounds, with no signature stage. Round two plans from round one's findings, implements, and is reviewed again. A second round that still does not pass ends the loop rather than opening a third: something upstream is wrong, and the caller takes it to the human. Reopening is a ruling, and the failing rounds stay in the record as history rather than being erased. A ruling to reopen names what went wrong to reach the cap (which brief, rule or agent let the defects through), and the caller records it in the project's log before the next round.
 
-A round narrower than the last is titled `scoped confirmation` and says in its
-header what it was scoped to, so a later reader cannot mistake a confirmation
-for a full pass.
+A round narrower than the last is titled `scoped confirmation` and says in its header what it was scoped to, so a later reader cannot mistake a confirmation for a full pass.
 
-Each round is written to its own file, `review-code-r<N>.md`, and carries a
-header line naming the agent, model, head commit, the diff expression, and the
-dispatch and return timestamps:
+Each round is written to its own file, `review-code-r<N>.md`, and carries a header line naming the agent, model, head commit, the diff expression, and the dispatch and return timestamps:
 
 ```
 `agent: <reviewer>` `model: <model>` `head: <sha>` `diff: git diff origin/main...HEAD` `dispatched: <UTC time>` `returned: <UTC time>`
 ```
 
-The agent's return is written **verbatim**. Where the calling session edits it
-at all — unescaping HTML entities is the only observed case — the edit is
-declared immediately under the header, naming exactly what changed.
+The agent's return is written **verbatim**. Where the calling session edits it at all — unescaping HTML entities is the only observed case — the edit is declared immediately under the header, naming exactly what changed.
 
 ## Rules that reach every line
 

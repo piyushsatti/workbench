@@ -44,6 +44,7 @@ func TestLoadSpacesRejects(t *testing.T) {
 		{"glob in deny_access", `{"deny_access":["~/Source/*"]}`, "globs are not allowed"},
 		{"glob in space root", `{"spaces":{"a":{"root":"~/Source/*"}}}`, "globs are not allowed"},
 		{"glob in attach", `{"spaces":{"a":{"root":"~/a","attach":["~/b*"]}}}`, "globs are not allowed"},
+		{"glob in a space's deny_access", `{"spaces":{"a":{"root":"~/a","deny_access":["~/a/*"]}}}`, "globs are not allowed"},
 		{"bad pattern", `{"deny_launch":["~/x/[a"]}`, "syntax error in pattern"},
 		{"unknown key", `{"deny_acess":["~/x"]}`, "unknown field"},
 		{"unknown space key", `{"spaces":{"a":{"root":"~/a","atach":[]}}}`, "unknown field"},

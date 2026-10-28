@@ -77,6 +77,11 @@ Chezmoi configuration's removal prompts. A system-root Workstation worktree cont
 a partial/component-only checkout needs an explicit verified Dotfiles source override. Tests and named build contexts may set
 `WORKSTATION_DOTFILES_SOURCE` explicitly.
 
+chezmoi owns the dotfiles once it is initialised from this repo (`chezmoi source-path` resolves to
+`setup/dotfiles`): the installer then leaves them alone, and verify checks only that `chezmoi status`
+has nothing to apply (scripts aside). The locked render is for machines where chezmoi is not set up
+from this source.
+
 The Ubuntu profile excludes Dotfiles' TPM run-once script because Workstation
 installs plugins at pinned commits.
 Every install records the source, profile, rendered digest and each target's

@@ -28,7 +28,7 @@ Version-specific model catalogs, free-model lists, CLI invocations, bugs, and la
 
 ## Claude Code role residue
 
-Claude Code dispatches subagents through the Task tool. For its model classes, cheapest capable means Sonnet class and strongest means Opus class. Keep this mapping with the delegation role, not in a harness-global shim.
+Claude Code dispatches subagents through the Task tool. For its model classes, cheapest capable means Haiku class (the default, as in Subagent dispatch), Sonnet class is what a call sets for judgement work, and strongest means Opus class. Keep this mapping with the delegation role, not in a harness-global shim.
 
 ## Subagent dispatch
 

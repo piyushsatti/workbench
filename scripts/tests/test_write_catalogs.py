@@ -52,6 +52,9 @@ class WriteCatalogsTests(unittest.TestCase):
             with redirect_stdout(StringIO()) as out:
                 WRITE.main([*args, "--apply"])
             self.assertIn("MISSING      absent", out.getvalue())
+            for rel in (".claude-plugin/marketplace.json", ".agents/plugins/marketplace.json"):
+                names = [p["name"] for p in json.loads((pi / rel).read_text())["plugins"]]
+                self.assertEqual(names, ["demo"], rel)
 
 
     def test_an_unpushed_plugin_is_left_out_and_the_lint_warns(self):

@@ -2,7 +2,7 @@
 
 Load when work is being captured, filed or picked up.
 
-All outstanding work lives in a `TODO.jsonl` in the project root, filed by category and tag, never as a flat list. Closed work, findings, ideas and every other record go to `LOGS.jsonl` beside it.
+All outstanding work lives in a `TODO.jsonl` in the project root, filed by category and tag, never as a flat list. Closed work and findings go to `LOGS.jsonl` beside it. Facts go to reference docs, as the routing table in [memory.md](../tooling/memory.md) routes them.
 
 - **Capture on arrival, file by domain.** An item being mentioned is not a reason to act on it.
 - **Two levels, split by scope.** Cross-cutting work goes in the top-level list. Work belonging to a single project goes in that project's own `TODO.jsonl`, in the project root. When a top-level item turns out to be project-scoped, delegate it: strike it through and point at the project's file instead of deleting it, so the trail from discovery to owner stays readable.
@@ -42,7 +42,7 @@ Each project's own CLAUDE.md defines which files to scan for ripple effects. Che
 
 Every plan file includes a blast-radius section: artifacts by scope, what is untouched, and reversibility.
 
-Non-trivial work gets a durable plan and a red/blue review of it (an adversarial pass against the plan, then a defending revision) before implementation starts.
+Non-trivial work gets a durable plan; for a high-stakes plan, run the crucible skill in red-vs-blue mode before implementation.
 
 ## Worktrees
 

@@ -104,10 +104,12 @@ Shows status: "Sync ON" or "Sync OFF". Useful for multi-server administration.
 |---------|--------|
 | `v` | Begin selection |
 | `C-v` | Toggle rectangle (block) selection |
-| `y` | Copy selection and exit |
+| `y` | Copy selection and leave copy mode |
+| Mouse drag | Copy the dragged selection and leave copy mode |
 | `Double-click` | Select word and copy to clipboard |
+| `Triple-click` | Select line and copy; the selection stays visible |
 
-**Note**: Selection stays visible after copying.
+**Note**: `y` and a mouse drag use `copy-pipe-and-cancel`, so copy mode ends; only a triple-click keeps the selection visible.
 
 ---
 
@@ -117,9 +119,9 @@ Shows status: "Sync ON" or "Sync OFF". Useful for multi-server administration.
 
 | Command | Action |
 |---------|--------|
-| `<prefix> S` | Open fuzzy finder to switch sessions |
+| `<prefix> S` | Open fuzzy finder to switch sessions (Linux only) |
 
-Uses `fzf` for interactive session selection.
+Uses `fzf` for interactive session selection. On macOS, use `<prefix> s` (tmux-sessionx).
 
 ---
 
@@ -139,7 +141,7 @@ Useful for quick commands without minimizing your main layout. Opens in current 
 
 Your tmux automatically:
 - **Saves state** every 10 minutes
-- **Restores sessions** on startup
+- **Restores sessions** on startup (Linux only; continuum restore is off on macOS)
 - **Preserves**: Pane contents, windows, directories
 - **Preserves processes**: vim, nvim, less, man, htop
 
@@ -180,6 +182,6 @@ Each is installed at the commit pinned in `.chezmoidata/tmux_plugins.json`: by `
 ## Tips
 
 - **Mouse**: Click panes to switch, scroll in copy mode, drag pane dividers
-- **Search in copy mode**: `<prefix> f` for forward search
+- **Search in copy mode**: `/` searches forward, `?` backward; `<prefix> f` is tmux's find-window, which searches window names and contents
 - **Quick refresh**: `<prefix> :` then type `source-file ~/.tmux.conf` and press Enter
 - **List all sessions**: `tmux list-sessions` or `<prefix> s`

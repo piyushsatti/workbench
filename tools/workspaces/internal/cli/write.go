@@ -57,6 +57,11 @@ func (a *App) editSpaces(change func(cur *config.Spaces, top *jsonedit.Object) (
 	if err != nil {
 		return a.fail(exitConfig, "%v", err)
 	}
+	unlock, code := a.lockConfig(path)
+	if code != exitOK {
+		return code
+	}
+	defer unlock()
 	raw, code := a.readForEdit(path, "{}")
 	if code != exitOK {
 		return code
@@ -86,6 +91,11 @@ func (a *App) editHarnesses(change func(cur *config.Harnesses, top *jsonedit.Obj
 	if err != nil {
 		return a.fail(exitConfig, "%v", err)
 	}
+	unlock, code := a.lockConfig(path)
+	if code != exitOK {
+		return code
+	}
+	defer unlock()
 	raw, code := a.readForEdit(path, config.DefaultHarnessesJSON)
 	if code != exitOK {
 		return code
@@ -106,6 +116,15 @@ func (a *App) editHarnesses(change func(cur *config.Harnesses, top *jsonedit.Obj
 		_, err := config.ParseHarnesses(b, a.home(), harness.Known)
 		return err
 	})
+}
+
+// lockConfig holds the lock on path's folder for the whole edit.
+func (a *App) lockConfig(path string) (func(), int) {
+	unlock, err := config.LockDir(filepath.Dir(path))
+	if err != nil {
+		return nil, a.fail(exitIOErr, "%v", err)
+	}
+	return unlock, exitOK
 }
 
 func (a *App) readForEdit(path, whenMissing string) ([]byte, int) {
@@ -237,23 +256,33 @@ func splitSpacePath(pos []string) (space, path string) {
 	return "", ""
 }
 
-// findEntry returns the entry that arg names, comparing paths once expanded and
-// resolved through symlinks.
-func (a *App) findEntry(entries []config.Entry, arg string) (config.Entry, bool) {
+// findEntries returns every entry that arg names, comparing paths once
+// expanded and resolved through symlinks, so a removal takes duplicates too.
+func (a *App) findEntries(entries []config.Entry, arg string) []config.Entry {
 	written, err := a.writtenPath(arg)
 	if err != nil {
-		return config.Entry{}, false
+		return nil
 	}
 	parsed, err := config.ParseEntry(written, a.home(), true)
 	if err != nil {
-		return config.Entry{}, false
+		return nil
 	}
+	var found []config.Entry
 	for _, e := range entries {
 		if e.Path == parsed.Path {
-			return e, true
+			found = append(found, e)
 		}
 	}
-	return config.Entry{}, false
+	return found
+}
+
+// writtenForms are the entries as written in the file.
+func writtenForms(entries []config.Entry) []string {
+	out := make([]string, len(entries))
+	for i, e := range entries {
+		out[i] = e.Written
+	}
+	return out
 }
 
 // pickEntry picks one of entries by its written form; without a terminal the

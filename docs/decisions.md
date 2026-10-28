@@ -46,7 +46,7 @@ What is decided now. When a decision changes, edit it here in place; git is the 
 
 ## Setup
 
-- chezmoi applies dotfiles. `setup/workstation/defaults.yml` holds profiles and package lists.
+- chezmoi applies dotfiles. Once chezmoi is initialised from `setup/dotfiles`, it owns them: Workstation's bootstrap leaves them alone and its verify checks only that chezmoi has nothing to apply. Workstation's locked render is for machines where chezmoi is not set up from this source. `setup/workstation/defaults.yml` holds profiles and package lists.
 - Profiles are `linux` (headless) and `linux-full` (`linux` plus `gui`), both on Ubuntu 26.04, plus `darwin`, which has no package lock, so bootstrap refuses it.
 - Setup never installs the OS, never customises the desktop and never installs Homebrew. `workbench setup` refuses on anything but Ubuntu 26.04.
 - No exact version pins where something else keeps things current: apt packages are listed by name and install at Ubuntu's version; CLIs (chezmoi, uv, Claude Code, Codex, OpenCode) install at their latest only when missing, and one already installed is never replaced. Pins stay only for checksummed downloads, tmux plugin commits and VS Code extensions.

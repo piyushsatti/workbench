@@ -12,9 +12,7 @@ sid=$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null)
 if [ -n "$sid" ]; then
   dir=$state/statusline
   mkdir -p "$dir" 2>/dev/null
-  acw=$(jq -r '.autoCompactWindow // empty' "$HOME/.claude/settings.json" 2>/dev/null)
-  printf '%s' "$input" | jq -c --arg acw "$acw" '. + {
-      autoCompactWindow: ($acw | tonumber? // null),
+  printf '%s' "$input" | jq -c '. + {
       local: {
         five_hour_reset: (.rate_limits.five_hour.resets_at // null | if . then strflocaltime("%H:%M") else null end),
         seven_day_reset: (.rate_limits.seven_day.resets_at // null | if . then strflocaltime("%a") else null end)
@@ -64,8 +62,15 @@ ctx_used=$(echo "$input" | jq -r '.context_window.used_percentage // empty')
 ctx_tokens=$(echo "$input" | jq -r '.context_window.total_input_tokens // empty')
 ctx_size=$(echo "$input" | jq -r '.context_window.context_window_size // empty')
 # Measure context against the autocompact window when one is set: that is the ceiling that
-# triggers a compaction, not the model's full window.
-compact_window=$(jq -r '.autoCompactWindow // empty' "$HOME/.claude/settings.json" 2>/dev/null)
+# triggers a compaction, not the model's full window. Only a positive integer counts, and only when it is
+# below the model's window, which caps it.
+compact_window=$(jq -r '.autoCompactWindow | select(type == "number" and . > 0 and . == floor and . < 1e15)' \
+  "$HOME/.claude/settings.json" 2>/dev/null)
+[[ $compact_window =~ ^[0-9]+$ ]] || compact_window=""
+[[ $ctx_tokens =~ ^[0-9]+$ ]] || ctx_tokens=""
+if [[ $ctx_size =~ ^[0-9]+$ ]] && [ -n "$compact_window" ] && [ "$compact_window" -ge "$ctx_size" ]; then
+  compact_window=""
+fi
 if [ -n "$compact_window" ] && [ -n "$ctx_tokens" ]; then
   ctx_size="$compact_window"
   ctx_used=$((ctx_tokens * 100 / compact_window))

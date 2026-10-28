@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -220,7 +222,8 @@ func TestSpaceAdd(t *testing.T) {
 		{name: "root through a symlink is written as typed", args: []string{"space", "add", "c", "~/link-c"},
 			wantSpaces: edit(addC, `"~/Source/Projects/c"`, `"~/link-c"`), out: "added space c (~/link-c)"},
 		{name: "new space in a file with no spaces key", spaces: `{"allow_launch":["~/Source"]}`, args: []string{"space", "add", "c", "~/Source/Projects/c"}, wantSpaces: onlyC},
-		{name: "compact input is reformatted, content kept", spaces: `{"allow_launch":["~/Source"],"spaces":{}}`, args: []string{"space", "add", "c", "~/Source/Projects/c"}, wantSpaces: onlyC},
+		{name: "spaces null is an empty object", spaces: `{"allow_launch":["~/Source"],"spaces":null}`, args: []string{"space", "add", "c", "~/Source/Projects/c"}, wantSpaces: onlyC},
+		{name: "compact input is reformatted, content kept",spaces: `{"allow_launch":["~/Source"],"spaces":{}}`, args: []string{"space", "add", "c", "~/Source/Projects/c"}, wantSpaces: onlyC},
 		{name: "root outside HOME stays absolute", spaces: `{"allow_launch":["/"]}`, args: []string{"space", "add", "c", outside},
 			wantSpaces: "{\n  \"allow_launch\": [\n    \"/\"\n  ],\n  \"spaces\": {\n    \"c\": {\n      \"root\": \"" + outside + "\"\n    }\n  }\n}\n",
 			out:        "added space c (" + outside + ")"},
@@ -338,6 +341,9 @@ func TestSpaceDetach(t *testing.T) {
 	}
 	runWriteCases(t, []writeCase{
 		{name: "--yes", args: []string{"space", "detach", "--yes", "a", "~/Source/Projects/b"}, wantSpaces: detached, out: "detached ~/Source/Projects/b from space a"},
+		{name: "every duplicate, in any written form",
+			spaces: `{"allow_launch":["~/Source"],"spaces":{"a":{"root":"~/Source/Projects/a","attach":["~/Source/Projects/b","/opt/x","~/link-b","~/Source/Projects/b"]}}}`,
+			args:   []string{"space", "detach", "--yes", "a", "~/Source/Projects/b"}, wantSpaces: withAttach("[\n        \"/opt/x\"\n      ]")},
 		{name: "--yes after the arguments", args: []string{"space", "detach", "a", "~/Source/Projects/b", "--yes"}, wantSpaces: detached},
 		{name: "absolute form matches the tilde form", args: []string{"space", "detach", "--yes", "a", "{HOME}/Source/Projects/b"}, wantSpaces: detached},
 		{name: "symlink form matches", args: []string{"space", "detach", "--yes", "a", "~/link-b"}, wantSpaces: detached},
@@ -437,5 +443,35 @@ func TestConfirmErrors(t *testing.T) {
 				t.Error("file changed")
 			}
 		})
+	}
+}
+
+// Concurrent edits each hold the config folder's lock from read to rename, so
+// none of them is lost.
+func TestConcurrentPolicyAdds(t *testing.T) {
+	f := newFixture(t)
+	f.writeConfig("spaces.json", baseSpaces)
+	const n = 16
+	codes := make(chan int, n)
+	for i := 0; i < n; i++ {
+		go func(i int) {
+			a := f.app()
+			a.Stdout, a.Stderr = io.Discard, io.Discard
+			codes <- a.Run([]string{"policy", "add", "deny_access", fmt.Sprintf("~/x%d", i)})
+		}(i)
+	}
+	for i := 0; i < n; i++ {
+		if code := <-codes; code != exitOK {
+			t.Fatalf("policy add exit %d", code)
+		}
+	}
+	got, err := os.ReadFile(filepath.Join(f.home, ".config/workspaces/spaces.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < n; i++ {
+		if !strings.Contains(string(got), fmt.Sprintf(`"~/x%d"`, i)) {
+			t.Errorf("~/x%d was lost:\n%s", i, got)
+		}
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -557,6 +558,14 @@ func (a *App) refuseRun(p *launchPlan) int {
 }
 
 func (a *App) launchInPlace(p *launchPlan) int {
+	// A space root removed since it was configured fails here, before an allow
+	// record claims a launch that cannot happen.
+	if p.spaceArg != "." {
+		if info, err := os.Stat(p.launchDir); err != nil || !info.IsDir() {
+			fmt.Fprintf(a.Stderr, "workspaces: space %s: root %s is not a folder\n", p.spaceArg, p.launchDir)
+			return exitInternal
+		}
+	}
 	if err := a.appendRecord(a.record(p, "allow", p.decision.Reason, p.decision.Rule)); err != nil {
 		fmt.Fprintf(a.Stderr, "workspaces: cannot write the launch log, nothing launched: %v\n", err)
 		return exitIOErr

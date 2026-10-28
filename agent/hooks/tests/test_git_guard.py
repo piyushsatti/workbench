@@ -57,127 +57,138 @@ ALLOW = [
     "env -v git status",
 ]
 
+# Each DENY row names the rule that must refuse it: a fragment of that rule's reason.
+MERGE_NO_VERIFY = "pre-merge-commit"
+COMMIT_N = "includes -n"
+COMMIT_NO_VERIFY = "skips the pre-commit"
+CONFIG_HIDDEN = "hides ~/.gitconfig"
+CONFIG_OVERRIDE = "for one command"
+CONFIG_EDIT = "config --edit"
+CONFIG_SECTION = "touches identity"
+CONFIG_WRITE = "would write"
+ENV_IDENTITY = "through the environment"
+
 DENY = [
     # --no-verify / -n on commit
-    "git commit --no-verify -m x",
-    "git commit -n -m x",
-    "git commit -nm x",
-    "git commit -anm x",
-    "git commit -m x -n",
-    "git commit --no-verif -m x",             # unambiguous abbreviation git accepts
-    "git commit '--no-verify' -m x",          # quoted flag
-    'git commit "-n" -m x',
-    "git commit -m x -- --no-verify",         # after `--`: denied, fail closed
-    "/usr/bin/git commit --no-verify",
-    "\\git commit -n",
-    "cd repo && git commit --no-verify -m x",
-    "true; git commit -n -m x",
-    "git status || git commit -n",
-    "git add . | git commit -n",
-    "if git commit -n -m x; then echo ok; fi",
-    "{ git commit -n; }",
-    "(cd repo && git commit -n)",
-    "echo $(git commit -n -m x)",
-    'echo "$(git commit -n -m x)"',
-    "echo `git commit -n`",
-    "git -C repo commit --no-verify",
-    "git --git-dir=.git commit -n",
-    "git -c core.editor=vim commit -n",
+    ("git commit --no-verify -m x", COMMIT_NO_VERIFY),
+    ("git commit -n -m x", COMMIT_N),
+    ("git commit -nm x", COMMIT_N),
+    ("git commit -anm x", COMMIT_N),
+    ("git commit -m x -n", COMMIT_N),
+    ("git commit --no-verif -m x", COMMIT_NO_VERIFY),             # unambiguous abbreviation git accepts
+    ("git commit '--no-verify' -m x", COMMIT_NO_VERIFY),          # quoted flag
+    ('git commit "-n" -m x', COMMIT_N),
+    ("git commit -m x -- --no-verify", COMMIT_NO_VERIFY),         # after `--`: denied, fail closed
+    ("/usr/bin/git commit --no-verify", COMMIT_NO_VERIFY),
+    ("\\git commit -n", COMMIT_N),
+    ("cd repo && git commit --no-verify -m x", COMMIT_NO_VERIFY),
+    ("true; git commit -n -m x", COMMIT_N),
+    ("git status || git commit -n", COMMIT_N),
+    ("git add . | git commit -n", COMMIT_N),
+    ("if git commit -n -m x; then echo ok; fi", COMMIT_N),
+    ("{ git commit -n; }", COMMIT_N),
+    ("(cd repo && git commit -n)", COMMIT_N),
+    ("echo $(git commit -n -m x)", COMMIT_N),
+    ('echo "$(git commit -n -m x)"', COMMIT_N),
+    ("echo `git commit -n`", COMMIT_N),
+    ("git -C repo commit --no-verify", COMMIT_NO_VERIFY),
+    ("git --git-dir=.git commit -n", COMMIT_N),
+    ("git -c core.editor=vim commit -n", COMMIT_N),
     # -c / --config-env overrides, before the subcommand
-    "git -c core.hooksPath=/dev/null commit -m x",
-    "git -c core.hookspath= commit -m x",
-    "git -c CORE.HOOKSPATH=/x commit",
-    "git -c user.email=bad@example.com commit -m x",
-    "git -c user.name=Mallory commit -m x",
-    "git -c author.email=bad@example.com commit",
-    "git -c 'alias.ci=commit --no-verify' ci -m x",
-    "git -c alias.x='!sh -c true' x",
-    "git -c include.path=/tmp/evil commit",
-    "git --config-env=core.hooksPath=EMPTY commit",
-    "git --config-env core.hooksPath=EMPTY commit",
+    ("git -c core.hooksPath=/dev/null commit -m x", CONFIG_OVERRIDE),
+    ("git -c core.hookspath= commit -m x", CONFIG_OVERRIDE),
+    ("git -c CORE.HOOKSPATH=/x commit", CONFIG_OVERRIDE),
+    ("git -c user.email=bad@example.com commit -m x", CONFIG_OVERRIDE),
+    ("git -c user.name=Mallory commit -m x", CONFIG_OVERRIDE),
+    ("git -c author.email=bad@example.com commit", CONFIG_OVERRIDE),
+    ("git -c 'alias.ci=commit --no-verify' ci -m x", CONFIG_OVERRIDE),
+    ("git -c alias.x='!sh -c true' x", CONFIG_OVERRIDE),
+    ("git -c include.path=/tmp/evil commit", CONFIG_OVERRIDE),
+    ("git --config-env=core.hooksPath=EMPTY commit", CONFIG_OVERRIDE),
+    ("git --config-env core.hooksPath=EMPTY commit", CONFIG_OVERRIDE),
     # git config writes
-    "git config user.email bad@example.com",
-    "git config --global user.name Mallory",
-    "git config --local user.email x@y",
-    "git config -f ~/.gitconfig user.email x@y",
-    "git config set user.email x@y",
-    "git config --unset core.hooksPath",
-    "git config --global --unset-all core.hooksPath",
-    "git config core.hooksPath /dev/null",
-    "git config --global alias.ci 'commit --no-verify'",
-    "git config --global include.path /tmp/x",
-    "git config credential.helper store",
-    "git config --remove-section user",
-    "git config --global --rename-section core old",
-    "git config --global --edit",
-    "git config -e",
-    "git config --replace-all user.email x@y",
+    ("git config user.email bad@example.com", CONFIG_WRITE),
+    ("git config --global user.name Mallory", CONFIG_WRITE),
+    ("git config --local user.email x@y", CONFIG_WRITE),
+    ("git config -f ~/.gitconfig user.email x@y", CONFIG_WRITE),
+    ("git config set user.email x@y", CONFIG_WRITE),
+    ("git config --unset core.hooksPath", CONFIG_WRITE),
+    ("git config --global --unset-all core.hooksPath", CONFIG_WRITE),
+    ("git config core.hooksPath /dev/null", CONFIG_WRITE),
+    ("git config --global alias.ci 'commit --no-verify'", CONFIG_WRITE),
+    ("git config --global include.path /tmp/x", CONFIG_WRITE),
+    ("git config credential.helper store", CONFIG_WRITE),
+    ("git config --remove-section user", CONFIG_SECTION),
+    ("git config --global --rename-section core old", CONFIG_SECTION),
+    ("git config --global --edit", CONFIG_EDIT),
+    ("git config -e", CONFIG_EDIT),
+    ("git config --replace-all user.email x@y", CONFIG_WRITE),
     # identity / config environment
-    "GIT_AUTHOR_NAME=Mallory git commit -m x",
-    "GIT_AUTHOR_EMAIL=bad@example.com git commit -m x",
-    "GIT_COMMITTER_EMAIL=bad@example.com git commit -m x",
-    "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0= git commit",
-    "GIT_CONFIG_GLOBAL=/dev/null git commit -m x",
-    "GIT_CONFIG_PARAMETERS=\"'core.hookspath'=''\" git commit",
-    "export GIT_AUTHOR_EMAIL=bad@example.com; git commit -m x",
-    "export GIT_COMMITTER_NAME=x",
-    "env GIT_AUTHOR_EMAIL=bad@example.com git commit -m x",
-    "env -u PATH GIT_COMMITTER_NAME=x git commit",
-    "FOO=1 GIT_AUTHOR_DATE=now git commit",
+    ("GIT_AUTHOR_NAME=Mallory git commit -m x", ENV_IDENTITY),
+    ("GIT_AUTHOR_EMAIL=bad@example.com git commit -m x", ENV_IDENTITY),
+    ("GIT_COMMITTER_EMAIL=bad@example.com git commit -m x", ENV_IDENTITY),
+    ("GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0= git commit", ENV_IDENTITY),
+    ("GIT_CONFIG_GLOBAL=/dev/null git commit -m x", ENV_IDENTITY),
+    ("GIT_CONFIG_PARAMETERS=\"'core.hookspath'=''\" git commit", ENV_IDENTITY),
+    ("export GIT_AUTHOR_EMAIL=bad@example.com; git commit -m x", ENV_IDENTITY),
+    ("export GIT_COMMITTER_NAME=x", ENV_IDENTITY),
+    ("env GIT_AUTHOR_EMAIL=bad@example.com git commit -m x", ENV_IDENTITY),
+    ("env -u PATH GIT_COMMITTER_NAME=x git commit", ENV_IDENTITY),
+    ("FOO=1 GIT_AUTHOR_DATE=now git commit", ENV_IDENTITY),
     # environment that hides ~/.gitconfig (and so core.hooksPath)
-    "env -i git commit -m x",
-    "env -i PATH=/usr/bin git commit -m x",
-    "env --ignore-environment git commit",
-    "env -u HOME git commit -m x",
-    "HOME=/tmp git commit -m x",
-    "XDG_CONFIG_HOME=/tmp HOME=/tmp git commit",
-    "export HOME=/tmp && git commit -m x",
-    "env -i sh -c 'git commit -m x'",
+    ("env -i git commit -m x", CONFIG_HIDDEN),
+    ("env -i PATH=/usr/bin git commit -m x", CONFIG_HIDDEN),
+    ("env --ignore-environment git commit", CONFIG_HIDDEN),
+    ("env -u HOME git commit -m x", CONFIG_HIDDEN),
+    ("HOME=/tmp git commit -m x", CONFIG_HIDDEN),
+    ("XDG_CONFIG_HOME=/tmp HOME=/tmp git commit", CONFIG_HIDDEN),
+    ("export HOME=/tmp && git commit -m x", CONFIG_HIDDEN),
+    ("env -i sh -c 'git commit -m x'", CONFIG_HIDDEN),
     # wrappers and nested shells
-    "sh -c 'git commit --no-verify'",
-    "bash -lc 'git commit -n -m x'",
-    "bash -c \"cd repo && git commit -n\"",
-    "zsh -c 'GIT_AUTHOR_NAME=x git commit'",
-    "sh -c \"sh -c 'git commit -n'\"",
-    "eval 'git commit -n -m x'",
-    "eval git commit --no-verify",
-    "command git commit -n",
-    "sudo -u me git commit -n",
-    "nohup git commit -n &",
-    "timeout 30 git commit -n",
-    "xargs -n 1 git commit -n < list",
-    "env -S 'GIT_AUTHOR_NAME=x git commit'",
-    "printf 'git commit -n' | sh",
-    "bash <<'EOF'\ngit commit --no-verify -m x\nEOF",
-    "bash <<< 'git commit -n'",
-    "cd x && bash <<EOF\ngit commit -n\nEOF",
-    "git commit -m \"$(cat <<'EOF'\nx\nEOF\n)\" --no-verify",
+    ("sh -c 'git commit --no-verify'", COMMIT_NO_VERIFY),
+    ("bash -lc 'git commit -n -m x'", COMMIT_N),
+    ("bash -c \"cd repo && git commit -n\"", COMMIT_N),
+    ("zsh -c 'GIT_AUTHOR_NAME=x git commit'", ENV_IDENTITY),
+    ("sh -c \"sh -c 'git commit -n'\"", COMMIT_N),
+    ("eval 'git commit -n -m x'", COMMIT_N),
+    ("eval git commit --no-verify", COMMIT_NO_VERIFY),
+    ("command git commit -n", COMMIT_N),
+    ("sudo -u me git commit -n", COMMIT_N),
+    ("nohup git commit -n &", COMMIT_N),
+    ("timeout 30 git commit -n", COMMIT_N),
+    ("xargs -n 1 git commit -n < list", COMMIT_N),
+    ("env -S 'GIT_AUTHOR_NAME=x git commit'", ENV_IDENTITY),
+    ("printf 'git commit -n' | sh", COMMIT_N),
+    ("bash <<'EOF'\ngit commit --no-verify -m x\nEOF", COMMIT_NO_VERIFY),
+    ("bash <<< 'git commit -n'", COMMIT_N),
+    ("cd x && bash <<EOF\ngit commit -n\nEOF", COMMIT_N),
+    ("git commit -m \"$(cat <<'EOF'\nx\nEOF\n)\" --no-verify", COMMIT_NO_VERIFY),
     # From the 2026-10-27 audit: each of these was allowed before.
-    "git commit -m fix#1 --no-verify",         # a # inside a word is not a comment
-    "echo a#b && git commit --no-verify -m x",
-    "git commit \\\n-n -m x",                 # backslash-newline joins the lines
-    "git commit -a --untracked-files -n -m x", # --untracked-files takes no separate value
-    "git config --rename-section evil core",   # the new name counts too
-    "env -S'git commit -n -m x'",              # -S with an attached script, not -i
-    "env -P /usr/bin git commit -n -m x",      # -P takes a value
-    "env -iS 'git commit --no-verify -m x'",   # a flag bundle ending in -S
-    "env -vS'git commit -n -m x'",
-    "env -iC /tmp git commit --no-verify -m x",  # a flag bundle ending in -C
-    "env -iu HOME git commit -m x",            # still env -i
-    "bash -o pipefail -c 'git commit -n -m x'",
-    "bash -O extglob -c 'git commit -n -m x'",
-    "git config -- user.email evil@example.com",
-    "git config -- core.hooksPath /dev/null",
-    "git config --global -- user.name x",
-    "unset HOME; git commit -m x",
-    "unset -v XDG_CONFIG_HOME HOME && git commit -m x",
-    "export -n HOME; git commit -m x",
-    "declare +x HOME; git commit -m x",
-    "typeset -g +x HOME; git commit -m x",
-    "git merge --no-verify feature",
-    "git -C repo pull --no-verify origin main",
-    "coproc git commit -n -m x",
-    "coproc worker { git commit --no-verify -m x; }",
+    ("git commit -m fix#1 --no-verify", COMMIT_NO_VERIFY),         # a # inside a word is not a comment
+    ("echo a#b && git commit --no-verify -m x", COMMIT_NO_VERIFY),
+    ("git commit \\\n-n -m x", COMMIT_N),                 # backslash-newline joins the lines
+    ("git commit -a --untracked-files -n -m x", COMMIT_N), # --untracked-files takes no separate value
+    ("git config --rename-section evil core", CONFIG_SECTION),   # the new name counts too
+    ("env -S'git commit -n -m x'", COMMIT_N),              # -S with an attached script, not -i
+    ("env -P /usr/bin git commit -n -m x", COMMIT_N),      # -P takes a value
+    ("env -iS 'git commit --no-verify -m x'", COMMIT_NO_VERIFY),   # a flag bundle ending in -S
+    ("env -vS'git commit -n -m x'", COMMIT_N),
+    ("env -iC /tmp git commit --no-verify -m x", COMMIT_NO_VERIFY),  # a flag bundle ending in -C
+    ("env -iu HOME git commit -m x", CONFIG_HIDDEN),            # still env -i
+    ("bash -o pipefail -c 'git commit -n -m x'", COMMIT_N),
+    ("bash -O extglob -c 'git commit -n -m x'", COMMIT_N),
+    ("git config -- user.email evil@example.com", CONFIG_WRITE),
+    ("git config -- core.hooksPath /dev/null", CONFIG_WRITE),
+    ("git config --global -- user.name x", CONFIG_WRITE),
+    ("unset HOME; git commit -m x", CONFIG_HIDDEN),
+    ("unset -v XDG_CONFIG_HOME HOME && git commit -m x", CONFIG_HIDDEN),
+    ("export -n HOME; git commit -m x", CONFIG_HIDDEN),
+    ("declare +x HOME; git commit -m x", CONFIG_HIDDEN),
+    ("typeset -g +x HOME; git commit -m x", CONFIG_HIDDEN),
+    ("git merge --no-verify feature", MERGE_NO_VERIFY),
+    ("git -C repo pull --no-verify origin main", MERGE_NO_VERIFY),
+    ("coproc git commit -n -m x", COMMIT_N),
+    ("coproc worker { git commit --no-verify -m x; }", COMMIT_NO_VERIFY),
 ]
 
 
@@ -195,11 +206,12 @@ class DecisionTable(unittest.TestCase):
                 self.assertIsNone(GUARD.decide(command))
 
     def test_denied(self):
-        for command in DENY:
+        for command, rule in DENY:
             with self.subTest(command=command):
                 reason = GUARD.decide(command)
                 self.assertIsNotNone(reason)
                 self.assertTrue(reason.startswith("git-guard: "))
+                self.assertIn(rule, reason)
 
     def test_unparseable_git_command_fails_closed(self):
         self.assertIn("could not parse", GUARD.decide("git commit -m 'unterminated"))

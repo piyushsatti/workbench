@@ -49,8 +49,9 @@ Rendered files carry no home-directory paths (a test checks this), so the Ubuntu
 ```sh
 # macOS
 brew install chezmoi
-# Linux
-sh -c "$(curl -fsLS get.chezmoi.io)" -- -b ~/.local/bin
+# Linux: Workstation (setup/workstation) installs a pinned chezmoi checked against the SHA-256 in
+# profiles/ubuntu-26.04/versions.json. Without it, download that version's release tarball and check
+# its SHA-256 against versions.json before extracting it to ~/.local/bin.
 
 chezmoi init --source ~/Source/workbench/setup/dotfiles
 chezmoi diff       # review what would change
@@ -109,8 +110,9 @@ nvm and fnm are not used.
 
 ## Workstation consumer profile
 
-The Ubuntu Workstation profiles consume Bash, tmux, Starship, Ghostty and btop
-from this source. Both keep Continuum restore enabled; automatic tmux boot is on
+The Ubuntu Workstation profiles consume Bash, tmux, Starship and btop from this
+source; `linux-full` also takes Ghostty and the VS Code `settings.json` and
+`keybindings.json`. Both keep Continuum restore enabled; automatic tmux boot is on
 for `linux-full` and off for `linux`. They exclude the TPM run-once script
 because Workstation pins every plugin itself.
 

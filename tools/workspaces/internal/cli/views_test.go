@@ -26,7 +26,7 @@ const (
 	todoCategory = `{"category":"misc","status":"done","title":"Only a category"}`
 	todoBare     = `{"status":null,"title":"No group at all"}`
 	logDated     = `{"date":"2026-10-01","kind":"completion","tag":"cli","title":"Shipped the loader","status":"done","body":"b"}`
-	logTS        = `{"ts":"2026-10-02T23:30:00+09:30","kind":"finding","tag":["infra","net"],"text":"t","title":"Found a leak"}`
+	logTS        = `{"ts":"2026-10-02T01:00:00+09:30","kind":"finding","tag":["infra","net"],"text":"t","title":"Found a leak"}`
 	logDomain    = `{"date":"2026-10-03","domain":"ops","origin":{"session":"s"},"status":"open","title":"Domain record"}`
 	logNull      = `{"date":"2026-10-04","kind":"ruling","tag":"policy","title":"Null status","status":null}`
 )
@@ -213,8 +213,8 @@ func TestSpaceShowCheckResults(t *testing.T) {
 	 "spaces":{"a":{"root":"~/Source/Projects/a","attach":["~/Source/Projects/b","~/Source/private/drafts","/etc","~/Source/Projects/_archive/old"],"deny_access":["~/Source/Projects/b"]},
 	  "k":{"root":"~/Source/private/drafts"}}}`)
 	out := f.runOK("space", "show", "a")
-	if got := showRows(t, out, "check root"); len(got) != 1 || got[0] != "refuse attach_denied ~/Source/Projects/b" {
-		t.Errorf("check root = %q", got)
+	if got := showRows(t, out, "check root"); len(got) != 1 || got[0] != "allow allow_launch ~/Source" {
+		t.Errorf("check root = %q, want the root's own check, attach paths apart", got)
 	}
 	want := []string{
 		"~/Source/Projects/b: attach_denied ~/Source/Projects/b",
@@ -228,6 +228,10 @@ func TestSpaceShowCheckResults(t *testing.T) {
 
 	if got := showRows(t, f.runOK("space", "show", "k"), "check root"); len(got) != 1 || got[0] != "refuse deny_launch ~/Source/private/*" {
 		t.Errorf("check root of k = %q", got)
+	}
+	f.writeConfig("spaces.json", `{"allow_launch":["~/Source/Projects/b"],"deny_access":["~/Source/Projects/b"],"spaces":{"a":{"root":"~/Source/Projects/a","attach":["~/Source/Projects/b"]}}}`)
+	if got := showRows(t, f.runOK("space", "show", "a"), "check root"); len(got) != 1 || got[0] != "refuse not_allowed" {
+		t.Errorf("check root of a refused root with a denied attach path = %q", got)
 	}
 	f.writeConfig("spaces.json", testSpaces)
 	if got := showRows(t, f.runOK("space", "show", "a"), "check root"); len(got) != 1 || got[0] != "allow allow_launch ~/Source" {
@@ -758,6 +762,20 @@ func TestTodoListWidthAndColumnsAcrossGroups(t *testing.T) {
 				t.Errorf("%s at %d, S1 at %d; columns differ across groups:\n%s", st, runeOffset(l, st), pos, f.stdout.String())
 			}
 		}
+	}
+}
+
+// Two groups whose names share their first fieldWidth runes stay apart; only
+// the header is cut.
+func TestTodoListGroupsByTheFullName(t *testing.T) {
+	f := newFixture(t)
+	long := strings.Repeat("g", fieldWidth+5)
+	f.writeFile("Source/Projects/a/TODO.jsonl",
+		`{"domain":"`+long+`-one","status":"s","title":"first"}`,
+		`{"domain":"`+long+`-two","status":"s","title":"second"}`)
+	got := outLines(f.runOK("todo", "list", "a"))
+	if len(got) != 4 || got[0] != field(long+"-one") || got[2] != field(long+"-two") {
+		t.Errorf("output = %q, want two groups with cut headers", got)
 	}
 }
 

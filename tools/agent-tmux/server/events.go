@@ -103,7 +103,7 @@ func (l *EventLog) Append(r record) error {
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if err := os.MkdirAll(filepath.Dir(l.path), 0o700); err != nil {
+	if err := privateDir(filepath.Dir(l.path)); err != nil {
 		return err
 	}
 	f, err := os.OpenFile(l.path, os.O_WRONLY|os.O_APPEND|os.O_CREATE|syscall.O_NOFOLLOW, 0o600)
@@ -334,8 +334,9 @@ func (s *Server) sweep() {
 	s.regMu.Unlock()
 }
 
-// lineHolds reports whether the last non-blank line of the pane still holds the text agent-tmux typed. The screen is
-// compared here and never sent anywhere. -J joins lines the terminal wrapped.
+// lineHolds reports whether the last non-blank line of the pane still ends with the text agent-tmux typed: typed text
+// waits at the line's end, after the prompt, so a prompt that merely contains it ("~/tools $" for "ls") does not
+// count. The screen is compared here and never sent anywhere. -J joins lines the terminal wrapped.
 func (s *Server) lineHolds(id, text string) (bool, error) {
 	want := strings.TrimSpace(text)
 	if want == "" {
@@ -346,7 +347,7 @@ func (s *Server) lineHolds(id, text string) (bool, error) {
 		return false, err
 	}
 	ls := strings.Split(lastLines(stripANSI(out), 1), "\n")
-	return strings.Contains(ls[len(ls)-1], want), nil
+	return strings.HasSuffix(strings.TrimRight(ls[len(ls)-1], " \t"), want), nil
 }
 
 var settleFields = []string{"pane_id", "session_id", "pane_current_command", typedOpt}

@@ -158,6 +158,23 @@ class DeployAgentTests(unittest.TestCase):
             self.assertIn("EXTRA", self.run_main(home))
             self.assertTrue((home / ".claude/agents/mine.md").exists())
 
+    def test_extras_are_only_reported_under_skill_folders_deploy_owns(self):
+        # ~/.claude/skills holds skills from other places (synced, plugin-made); only folders agent/skills
+        # names are deploy's to report on.
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            owned = next(p.name for p in (MODULE.AGENT / "skills").iterdir() if p.is_dir())
+            for folder in (home / ".claude/skills", home / ".agents/skills"):
+                (folder / "synced/other").mkdir(parents=True)
+                (folder / "synced/other/SKILL.md").write_text("x")
+                (folder / owned).mkdir(parents=True)
+                (folder / owned / "stray.md").write_text("x")
+            with mock.patch.object(MODULE, "HOME", home):
+                extras = {p.relative_to(home) for p in MODULE.extras()}
+            self.assertIn(Path(".claude/skills") / owned / "stray.md", extras)
+            self.assertIn(Path(".agents/skills") / owned / "stray.md", extras)
+            self.assertFalse([p for p in extras if "synced" in p.parts], extras)
+
     def test_plugin_executables_install_with_their_mode(self):
         with tempfile.TemporaryDirectory() as temp:
             home, plugins = Path(temp) / "home", Path(temp) / "plugins"
@@ -236,6 +253,11 @@ class DeployAgentTests(unittest.TestCase):
             self.assertNotIn("model", data)
             has_shell = "Bash" in MODULE.tools_of(fields)
             self.assertEqual(data.get("features", {}).get("shell_tool", True), has_shell)
+
+    def test_frontmatter_strips_one_matching_pair_of_quotes_only(self):
+        fields, _ = MODULE.frontmatter(
+            "---\na: \"quoted\"\nb: 'it''s'\nc: 'one' and 'two'\nd: it's\ne: \"say \\\"hi\\\"\"\n---\n")
+        self.assertEqual(fields, {"a": "quoted", "b": "it's", "c": "'one' and 'two'", "d": "it's", "e": 'say "hi"'})
 
     def test_frontmatter_reads_folded_descriptions_and_escapes_bodies(self):
         fields, _ = MODULE.frontmatter("---\nname: x\ndescription: >-\n  one\n  two: three\ntools: Read, Bash\n---\nBody\n")

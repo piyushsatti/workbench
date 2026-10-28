@@ -215,7 +215,6 @@ class InstallerProfileTests(unittest.TestCase):
             WORKSTATION.config()
         dotfiles.assert_called_once()
         seeds.assert_called_once()
-        self.assertNotIn(WORKSTATION.NO_DOTFILES_LOCK, WORKSTATION.REPORT["pending"])
         self.assertEqual(WORKSTATION.dotfiles_lock()["profile"], "linux")
 
     def test_linux_verifies_only_its_packages(self):

@@ -39,6 +39,16 @@ if [[ " ${PACKAGES[*]} " == *" code "* ]]; then
   trap 'rm -r "$TEMP_DIR"' EXIT
   curl --fail --silent --show-error --location --retry 3 --max-time 120 \
     https://packages.microsoft.com/keys/microsoft.asc -o "$TEMP_DIR/microsoft.asc"
+  # Trust the download only if it is exactly Microsoft's release signing key.
+  MICROSOFT_FINGERPRINT=BC528686B50D79E339D3721CEB3E94ADBE1229CF
+  export GNUPGHOME="$TEMP_DIR/gnupg"
+  install -d -m 0700 "$GNUPGHOME"
+  fingerprints=$(gpg --batch --with-colons --show-keys "$TEMP_DIR/microsoft.asc" | awk -F: '$1 == "fpr" {print $10}')
+  if [[ $fingerprints != "$MICROSOFT_FINGERPRINT" ]]; then
+    printf 'The Microsoft key has fingerprint %s, want %s; not adding the VS Code repository.\n' \
+      "${fingerprints//$'\n'/ }" "$MICROSOFT_FINGERPRINT" >&2
+    exit 1
+  fi
   gpg --batch --dearmor --output "$TEMP_DIR/microsoft.gpg" "$TEMP_DIR/microsoft.asc"
   install -d -m 0755 /etc/apt/keyrings
   install -m 0644 "$TEMP_DIR/microsoft.gpg" /etc/apt/keyrings/workstation-microsoft.gpg

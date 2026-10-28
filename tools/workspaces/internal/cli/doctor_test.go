@@ -171,6 +171,12 @@ func TestDoctorChecks(t *testing.T) {
 			// attach_denied belongs to the attach row, not the root row.
 			{"space roots", "OK", ""},
 		}, exitConfig},
+		{"attach under the space's own deny_access", func(f *fixture) {
+			f.writeConfig("spaces.json", `{"allow_launch":["~/Source"],"spaces":{"a":{"root":"~/Source/Projects/a","attach":["~/Source/Projects/b"],"deny_access":["~/Source/Projects/b"]}}}`)
+		}, []verdict{{"attach paths", "FAIL", "a attach ~/Source/Projects/b is under deny_access ~/Source/Projects/b"}}, exitConfig},
+		{"root refused while an attach path is denied", func(f *fixture) {
+			f.writeConfig("spaces.json", `{"allow_launch":["~/Source/Projects/c"],"deny_access":["~/Source/Projects/b"],"spaces":{"a":{"root":"~/Source/Projects/a","attach":["~/Source/Projects/b"]}}}`)
+		}, []verdict{{"space roots", "FAIL", "a: not_allowed"}}, exitConfig},
 		{"harness binary missing", func(f *fixture) { delete(f.lookPath, "claude") },
 			[]verdict{{"harness binaries", "FAIL", "not found: claude (claude), claude-alt (claude)"}}, exitConfig},
 		{"harness bin override looked up", func(f *fixture) {
@@ -199,9 +205,18 @@ func TestDoctorChecks(t *testing.T) {
 		{"wrapper without agent", func(f *fixture) {
 			f.write(".bash_aliases", `claude() { command claude "$@"; }`+"\n"+`claude-alt() { workspaces run . claude-alt "$@"; }`+"\n")
 		}, []verdict{{"wrappers", "WARN", "for: claude$"}}, exitOK},
-		{"multi-line wrapper form", func(f *fixture) {
+		{"closing brace on its own line", func(f *fixture) {
 			f.write(".bash_aliases", "claude() { workspaces run . claude \"$@\"\n}\nclaude-alt () { workspaces run . claude-alt; }\n")
 		}, []verdict{{"wrappers", "OK", ""}}, exitOK},
+		{"multi-line body and the function keyword", func(f *fixture) {
+			f.write(".bash_aliases", "claude() {\n  workspaces run . claude \"$@\"\n}\nfunction claude-alt {\n  workspaces run . claude-alt \"$@\"\n}\n")
+		}, []verdict{{"wrappers", "OK", ""}}, exitOK},
+		{"awm run counts as the wrapper", func(f *fixture) {
+			f.write(".bash_aliases", "claude() { awm run . claude \"$@\"; }\nfunction claude-alt() { awm run . claude-alt; }\n")
+		}, []verdict{{"wrappers", "OK", ""}}, exitOK},
+		{"multi-line body without the wrapper", func(f *fixture) {
+			f.write(".bash_aliases", "claude() {\n  command claude \"$@\"\n}\nclaude-alt() { workspaces run . claude-alt; }\n")
+		}, []verdict{{"wrappers", "WARN", "for: claude$"}}, exitOK},
 		{"codex harness needs its wrapper", func(f *fixture) {
 			f.writeConfig("harness.json", `{"default":"claude","harnesses":{"claude":{"adapter":"claude"},"codex":{"adapter":"codex"}}}`)
 			f.lookPath["codex"] = "/usr/bin/codex"
@@ -265,7 +280,10 @@ func TestDoctorChecks(t *testing.T) {
 		{"tmux answers oddly", func(f *fixture) {
 			f.tmuxReply = func([]string) (string, error) { return "", errors.New("tmux list-sessions: protocol version mismatch") }
 		}, []verdict{{"tmux", "WARN", "the server did not answer: tmux list-sessions: protocol version mismatch"}}, exitOK},
-		{"TMUX set and the server answers", func(f *fixture) { f.env["TMUX"] = "/tmp/tmux-1000/default,1,0" },
+		{"session names with spaces count once", func(f *fixture) {
+			f.tmuxReply = func([]string) (string, error) { return "main\nmy work\n\nx y z\n", nil }
+		}, []verdict{{"tmux", "OK", "server answers, 3 sessions"}}, exitOK},
+		{"TMUX set and the server answers",func(f *fixture) { f.env["TMUX"] = "/tmp/tmux-1000/default,1,0" },
 			[]verdict{{"tmux", "OK", "server answers"}}, exitOK},
 		{"TMUX set and the server is dead", func(f *fixture) {
 			f.env["TMUX"] = "/tmp/tmux-1000/default,1,0"
