@@ -27,34 +27,30 @@ fi
 fmt_epoch() {
   date -r "$1" +"$2" 2>/dev/null || date -d "@$1" +"$2" 2>/dev/null
 }
-# Seconds since the epoch for an ISO 8601 UTC timestamp such as 2026-10-25T14:40:08.123Z.
-iso_epoch() {
-  date -d "$1" +%s 2>/dev/null || date -j -u -f '%Y-%m-%dT%H:%M:%S' "${1%%.*}" +%s 2>/dev/null || echo 0
-}
 
 # ── Catppuccin Mocha palette ───────────────────────────────
 # Primary (bold, high contrast)
-lavender='\033[38;2;180;190;254m'  # #b4befe — folder
+lavender=$'\033[38;2;180;190;254m'  # #b4befe — folder
 
 # Secondary (medium contrast)
-subtext1='\033[38;2;186;194;222m'  # #bac2de — branch
-teal='\033[38;2;148;226;213m'      # #94e2d5 — venv
-sky='\033[38;2;137;220;235m'       # #89dceb — session name
-sapphire='\033[38;2;116;199;236m'  # #74c7ec — ctx usage (normal)
-flamingo='\033[38;2;242;205;205m'  # #f2cdcd — output style
-blue='\033[38;2;137;180;250m'      # #89b4fa — effort level
+subtext1=$'\033[38;2;186;194;222m'  # #bac2de — branch
+teal=$'\033[38;2;148;226;213m'      # #94e2d5 — venv
+sky=$'\033[38;2;137;220;235m'       # #89dceb — session name
+sapphire=$'\033[38;2;116;199;236m'  # #74c7ec — ctx usage (normal)
+flamingo=$'\033[38;2;242;205;205m'  # #f2cdcd — output style
+blue=$'\033[38;2;137;180;250m'      # #89b4fa — effort level
 
 # Accent
-mauve='\033[38;2;203;166;247m'     # #cba6f7 — model
-red='\033[38;2;243;139;168m'       # #f38ba8 — model when >200k / ctx when >80%
-green='\033[38;2;166;227;161m'     # #a6e3a1 — rate limit low
-yellow='\033[38;2;249;226;175m'    # #f9e2af — rate limit mid
-peach='\033[38;2;250;179;135m'     # #fab387 — rate limit high
+mauve=$'\033[38;2;203;166;247m'     # #cba6f7 — model
+red=$'\033[38;2;243;139;168m'       # #f38ba8 — model when >200k / ctx when >80%
+green=$'\033[38;2;166;227;161m'     # #a6e3a1 — rate limit low
+yellow=$'\033[38;2;249;226;175m'    # #f9e2af — rate limit mid
+peach=$'\033[38;2;250;179;135m'     # #fab387 — rate limit high
 
 # Chrome
-overlay0='\033[38;2;108;112;134m'  # #6c7086 — brackets / muted labels
-bold='\033[1m'
-reset='\033[0m'
+overlay0=$'\033[38;2;108;112;134m'  # #6c7086 — brackets / muted labels
+bold=$'\033[1m'
+reset=$'\033[0m'
 
 # ── Extract fields ─────────────────────────────────────────
 cwd=$(echo "$input" | jq -r '.cwd // empty')
@@ -233,11 +229,11 @@ head_cols=$(( ${#model} + 3 + ${#effort_label} + (${#effort_label} > 0 ? 1 : 0) 
 # (O) mid, tool calls and results light, free (the auto-compact reserve included) dark. Neighbours
 # alternate light and dark so the parts stay apart. The cc-status mod lays out the cells (f i o t .) at
 # each turn's end; until it has, the percentage and token count as before.
-g_fixed='\033[38;2;108;112;134m'    # #6c7086 overlay0
-g_in='\033[38;2;205;214;244m'       # #cdd6f4 text
-g_out='\033[38;2;147;153;178m'      # #9399b2 overlay2
-g_tools='\033[38;2;186;194;222m'    # #bac2de subtext1
-g_free='\033[38;2;49;50;68m'        # #313244 surface0
+g_fixed=$'\033[38;2;108;112;134m'    # #6c7086 overlay0
+g_in=$'\033[38;2;205;214;244m'       # #cdd6f4 text
+g_out=$'\033[38;2;147;153;178m'      # #9399b2 overlay2
+g_tools=$'\033[38;2;186;194;222m'    # #bac2de subtext1
+g_free=$'\033[38;2;49;50;68m'        # #313244 surface0
 ctx_bar=""
 ctx_file="${XDG_STATE_HOME:-$HOME/.local/state}/claude/statusline/$(echo "$input" | jq -r '.session_id // empty').ctx.json"
 if [ -f "$ctx_file" ]; then
@@ -300,21 +296,20 @@ if [ -n "$weekly_pct" ]; then
   [ -n "$line3" ] && line3="${line3} ${seg}" || line3="${seg}"
 fi
 
-# ── Cache state: warm/cold and time left, on a one-hour clock from the last reply ──
-# An estimate, not a live server check. Updates when the status line redraws.
-transcript=$(echo "$input" | jq -r '.transcript_path // empty')
-if [ -n "$transcript" ] && [ -f "$transcript" ]; then
-  last_ts=$(tail -n 60 "$transcript" | jq -r 'select(.type=="assistant") | .timestamp' 2>/dev/null | tail -n 1)
-  if [ -n "$last_ts" ]; then
-    left=$(( 3600 - ( $(date +%s) - $(iso_epoch "$last_ts") ) ))
-    if [ "$left" -gt 0 ]; then
-      if [ "$left" -le 600 ]; then cache_color="${peach}"; else cache_color="${green}"; fi
-      cache_seg="${overlay0}[cache ${cache_color}warm $((left / 60))m${overlay0}]${reset}"
-    else
-      cache_seg="${overlay0}[cache ${red}cold${overlay0}]${reset}"
-    fi
-    line2="${line2} ${cache_seg}"
+# ── Cache state: Claude Code's own prompt_cache (warm, expires_at), so the 5-minute and 1-hour TTLs both read
+# right. Claude Code also redraws the status line when expires_at passes. Older versions send no prompt_cache.
+# `// ""` would turn warm=false into "", so null is mapped by hand. The separator is ',', not a tab: read
+# collapses IFS whitespace, so a tab would let an empty warm take expires_at's value.
+IFS=, read -r cache_warm cache_expires < <(echo "$input" | jq -r '.prompt_cache // {} | "\(.warm | if . == null then "" else tostring end),\(.expires_at // "")"')
+if [ -n "$cache_warm" ]; then
+  left=$(( ${cache_expires:-0} - $(date +%s) ))
+  if [ "$cache_warm" = "true" ] && [ "$left" -gt 0 ]; then
+    if [ "$left" -le 120 ]; then cache_color="${peach}"; else cache_color="${green}"; fi
+    cache_seg="${overlay0}[cache ${cache_color}warm $(( (left + 59) / 60 ))m${overlay0}]${reset}"
+  else
+    cache_seg="${overlay0}[cache ${red}cold${overlay0}]${reset}"
   fi
+  line2="${line2} ${cache_seg}"
 fi
 
 # ── observational-memory: its own segment, when it is installed ───────
@@ -326,7 +321,7 @@ fi
 # ── Output ─────────────────────────────────────────────────────────────
 # Line 3 (5h and 7d) is drawn at the right of the prompt footer by the cc-status mod, from the sidecar
 # above. To draw it here again:
-#   [ -n "$line3" ] && printf "%b\n" "$line3"
-printf "%b\n" "$line1"
-printf "%b\n" "$line2"
+#   [ -n "$line3" ] && printf '%s\n' "$line3"
+# %s, not %b: the colours are real escape bytes already, and the data (folder, branch, agent name) is printed as is.
+printf '%s\n' "$line1" "$line2"
 exit 0

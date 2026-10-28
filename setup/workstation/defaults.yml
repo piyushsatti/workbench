@@ -12,7 +12,7 @@
 # offers. CLIs (chezmoi, uv and the agent harnesses) install only when missing; one already
 # installed is kept and updates itself. Pins remain only where nothing else updates or checks:
 # chezmoi and the font in <locks>/versions.json (checksummed), tmux plugin commits in
-# <locks>/plugins.json, and VS Code extensions in <locks>/extensions.json.
+# Dotfiles' .chezmoidata/tmux_plugins.json, and VS Code extensions in <locks>/extensions.json.
 #
 # Keys that drive installation: a profile's locks, dotfiles_lock and modules, and a module's
 # requires, apt, harnesses and claude_plugins. Labels only, which the installer parses but
@@ -60,7 +60,7 @@ modules:
     apt: [bash-completion, starship, btop, eza, fd-find, fzf, ripgrep, zoxide, bat, lazygit, ncurses-term]
     tools: [dotfiles, fd-bat-wrappers]
 
-  # tmux and its plugins pinned in <locks>/plugins.json. tmux-thumbs is compiled with cargo.
+  # tmux and its plugins pinned in Dotfiles' .chezmoidata/tmux_plugins.json. tmux-thumbs is compiled with cargo.
   tmux:
     requires: [dev]
     apt: [tmux]
@@ -71,9 +71,8 @@ modules:
     apt: [neovim]
 
   # Development runtimes and build toolchains: C, Python, Node, Rust, Java, CMake, uv, gh.
-  # python3-yaml is in apt.txt but nothing in this installer imports it.
   dev:
-    apt: [build-essential, python3, python3-venv, python3-yaml, nodejs, npm, cargo, rustc, pkg-config, libssl-dev, pipx, cmake, ninja-build, default-jdk, maven, gh]
+    apt: [build-essential, python3, python3-venv, nodejs, npm, cargo, rustc, pkg-config, libssl-dev, pipx, cmake, ninja-build, default-jdk, maven, gh]
     tools: [uv]
 
   # Docker Engine with Compose and Buildx; bootstrap adds the user to the docker group.

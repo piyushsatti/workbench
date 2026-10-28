@@ -47,6 +47,7 @@ func doctorFixture(t *testing.T) *fixture {
 	}
 	f.write(".bash_aliases", healthyAliases)
 	f.write(".claude/settings.json", healthySettings)
+	f.write(".claude-alt/settings.json", healthySettings)
 	f.lookPath["workspaces"] = filepath.Join(f.home, ".local/bin/workspaces")
 	f.tmuxReply = func(args []string) (string, error) {
 		if args[0] == "list-sessions" {
@@ -87,7 +88,7 @@ func doctorRowOf(t *testing.T, out, check string) (level, detail string) {
 
 var allChecks = []string{
 	"config", "paths", "space roots", "attach paths", "harness binaries", "config dirs", "wrappers",
-	"settings", "session hook", "launch log", "workspaces binary", "tmux", "todo",
+	"settings", "session hook", "settings", "session hook", "launch log", "workspaces binary", "tmux", "todo",
 }
 
 func TestDoctorHealthy(t *testing.T) {
@@ -175,10 +176,10 @@ func TestDoctorChecks(t *testing.T) {
 		{"harness bin override looked up", func(f *fixture) {
 			f.writeConfig("harness.json", `{"default":"claude","harnesses":{"claude":{"adapter":"claude","bin":"my-claude"}}}`)
 		}, []verdict{{"harness binaries", "FAIL", "claude (my-claude)"}}, exitConfig},
-		{"config dir missing", func(f *fixture) { os.Remove(filepath.Join(f.home, ".claude-alt")) },
+		{"config dir missing", func(f *fixture) { os.RemoveAll(filepath.Join(f.home, ".claude-alt")) },
 			[]verdict{{"config dirs", "WARN", "claude-alt: CLAUDE_CONFIG_DIR=~/.claude-alt"}}, exitOK},
 		{"config dir is a file", func(f *fixture) {
-			os.Remove(filepath.Join(f.home, ".claude-alt"))
+			os.RemoveAll(filepath.Join(f.home, ".claude-alt"))
 			f.write(".claude-alt", "")
 		}, []verdict{{"config dirs", "WARN", "claude-alt"}}, exitOK},
 		{"codex home missing", func(f *fixture) {
@@ -427,5 +428,22 @@ func TestDoctorCleansDetails(t *testing.T) {
 	f.run("doctor")
 	if strings.Contains(f.stdout.String(), "\x1b") {
 		t.Errorf("escape sequence reached the output: %q", f.stdout.String())
+	}
+}
+
+// A harness with its own CLAUDE_CONFIG_DIR gets its settings checked too: the
+// OK rows for ~/.claude say nothing about the sessions that profile starts.
+func TestDoctorChecksEachClaudeConfigDir(t *testing.T) {
+	f := doctorFixture(t)
+	os.Remove(filepath.Join(f.home, ".claude-alt/settings.json"))
+	f.run("doctor")
+	out := f.stdout.String()
+	for _, want := range []string{
+		"WARN  settings           ~/.claude-alt/settings.json missing required",
+		"WARN  session hook       ~/.claude-alt/settings.json: no SessionStart hook",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("no row %q in:\n%s", want, out)
+		}
 	}
 }

@@ -6,6 +6,9 @@
     "filesystem": {
       "allowWrite": [
         "~/.cache/uv"
+      ],
+      "denyWrite": [
+        "./.git"
       ]
     },
     "network": {
@@ -27,7 +30,6 @@
       "Bash(git diff:*)",
       "Bash(git log:*)",
       "Bash(git show:*)",
-      "Bash(git branch:*)",
       "Bash(gh pr view:*)",
       "Bash(gh run list:*)",
       "Bash(gh run view:*)"
@@ -44,6 +46,15 @@
       "Bash(git push:*)",
       "Bash(git rebase:*)",
       "Bash(git reset:*)",
+      "Bash(git branch -d:*)",
+      "Bash(git branch -D:*)",
+      "Bash(git checkout:*)",
+      "Bash(git cherry-pick:*)",
+      "Bash(git clean:*)",
+      "Bash(git restore:*)",
+      "Bash(git revert:*)",
+      "Bash(git stash:*)",
+      "Bash(git switch:*)",
       "Bash(git * add*)",
       "Bash(git * commit*)",
       "Bash(git * merge*)",

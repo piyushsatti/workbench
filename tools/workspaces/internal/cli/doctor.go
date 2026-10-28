@@ -23,7 +23,7 @@ const usageDoctor = `Usage: workspaces doctor
 Checks that workspaces is set up: the config files, the paths they name, each
 space's launch check, harness binaries and their config dirs, the wrappers in
 ~/.bash_aliases, the protection entries and the SessionStart hook in
-~/.claude/settings.json (read only), that the launch log is writable, that
+settings.json of each Claude config folder a harness uses (read only), that the launch log is writable, that
 workspaces (or its awm link) is ~/.local/bin/workspaces on PATH, tmux, and which spaces still keep their
 todo list in TODO.md.
 
@@ -96,7 +96,10 @@ func (a *App) doctorRows() []doctorRow {
 	if hs != nil {
 		rows = append(rows, a.checkBinaries(hs), a.checkConfigDirs(hs), a.checkWrappers(hs))
 	}
-	rows = append(rows, a.checkSettings(), a.checkHook(), a.checkLogWritable(), a.checkAgentPath(), a.checkTmux())
+	for _, dir := range a.claudeConfigDirs(hs) {
+		rows = append(rows, a.checkSettings(dir), a.checkHook(dir))
+	}
+	rows = append(rows, a.checkLogWritable(), a.checkAgentPath(), a.checkTmux())
 	if cfg != nil {
 		rows = append(rows, checkTodo(cfg))
 	}
@@ -111,7 +114,7 @@ func (a *App) doctorConfig() (*config.Spaces, *config.Harnesses, error) {
 		return nil, nil, err
 	}
 	cfg, _, spacesErr := config.LoadSpaces(spacesPath, a.home())
-	hs, harnessErr := config.LoadHarnesses(harnessPath, a.home(), knownAdapter)
+	hs, harnessErr := config.LoadHarnesses(harnessPath, a.home(), harness.Known)
 	return cfg, hs, errors.Join(spacesErr, harnessErr)
 }
 
@@ -238,10 +241,29 @@ type settingsFile struct {
 	} `json:"hooks"`
 }
 
-// readSettings reads ~/.claude/settings.json. A missing file is a file with
-// nothing in it.
-func (a *App) readSettings() (settingsFile, string, error) {
-	path := filepath.Join(a.home(), ".claude", "settings.json")
+// claudeConfigDirs are the distinct folders the claude-adapter harnesses run
+// with, each checked on its own: a profile's settings protect only its sessions.
+func (a *App) claudeConfigDirs(hs *config.Harnesses) []string {
+	var dirs []string
+	if hs != nil {
+		for _, name := range hs.Names() {
+			if h := hs.Harnesses[name]; h.Adapter == "claude" {
+				if dir := a.claudeConfigDir(h); !slices.Contains(dirs, dir) {
+					dirs = append(dirs, dir)
+				}
+			}
+		}
+	}
+	if len(dirs) == 0 {
+		dirs = append(dirs, a.claudeConfigDir(config.Harness{}))
+	}
+	return dirs
+}
+
+// readSettings reads settings.json in a Claude config folder. A missing file
+// is a file with nothing in it.
+func (a *App) readSettings(dir string) (settingsFile, string, error) {
+	path := filepath.Join(dir, "settings.json")
 	var s settingsFile
 	data, err := os.ReadFile(path)
 	switch {
@@ -253,8 +275,8 @@ func (a *App) readSettings() (settingsFile, string, error) {
 	return s, path, json.Unmarshal(data, &s)
 }
 
-func (a *App) checkSettings() doctorRow {
-	s, path, err := a.readSettings()
+func (a *App) checkSettings(dir string) doctorRow {
+	s, path, err := a.readSettings(dir)
 	if err != nil {
 		return doctorRow{levelWarn, "settings", fmt.Sprintf("cannot read %s: %v", a.tildePath(path), err)}
 	}
@@ -288,22 +310,22 @@ func (a *App) checkSettings() doctorRow {
 	if len(optional) > 0 {
 		detail += " (optional, not set: " + strings.Join(optional, ", ") + ")"
 	}
-	return doctorRow{levelOK, "settings", detail}
+	return doctorRow{levelOK, "settings", a.tildePath(path) + " " + detail}
 }
 
-func (a *App) checkHook() doctorRow {
-	s, path, err := a.readSettings()
+func (a *App) checkHook(dir string) doctorRow {
+	s, path, err := a.readSettings(dir)
 	if err != nil {
 		return doctorRow{levelWarn, "session hook", fmt.Sprintf("cannot read %s: %v", a.tildePath(path), err)}
 	}
 	for _, group := range s.Hooks["SessionStart"] {
 		for _, h := range group.Hooks {
 			if strings.Contains(h.Command, sessionHookCommand) {
-				return doctorRow{levelOK, "session hook", "SessionStart runs " + sessionHookCommand}
+				return doctorRow{levelOK, "session hook", a.tildePath(path) + " SessionStart runs " + sessionHookCommand}
 			}
 		}
 	}
-	return doctorRow{levelWarn, "session hook", "no SessionStart hook runs `" + sessionHookCommand + "`; session list cannot show where a session ran"}
+	return doctorRow{levelWarn, "session hook", a.tildePath(path) + ": no SessionStart hook runs `" + sessionHookCommand + "`; session list cannot show where a session ran"}
 }
 
 func (a *App) checkLogWritable() doctorRow {

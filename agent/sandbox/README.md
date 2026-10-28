@@ -4,7 +4,7 @@ There are two Claude Code profiles, and each repository picks one. These are tem
 
 | Profile | Shape |
 |---|---|
-| `strict.json` | The sandbox is mandatory (`failIfUnavailable`, no unsandboxed commands). Network is limited to the package index. The agent can read and inspect, and every git write (add, commit, merge, push, rebase, reset) is denied, so a human commits. `.env` is denied for reading and editing. |
+| `strict.json` | The sandbox is mandatory (`failIfUnavailable`, no unsandboxed commands). Network is limited to the package index. The agent can read and inspect, and a human commits: the sandbox blocks every write to the project's `.git` (`denyWrite: ["./.git"]`), so branch deletes, commits, resets and the like fail at the OS level whatever the command looks like, and the deny list also stops the commands that rewrite working files instead (`checkout`, `restore`, `clean`, `stash`, `revert`, `cherry-pick`, `switch`). `.env` is denied for reading and editing. |
 | `permissive.json` | The sandbox is on and sandboxed Bash runs without asking. `git` and `gh` run outside the sandbox so worktrees and credentials work. Read-only git and gh commands are allowed, every write asks, and destructive history operations (force push, branch or tag delete, `reset --hard`, `clean`, forced checkout or switch, writes to `.git/`) are denied. |
 
 Add project tools and MCP read tools to `permissions.allow` per repository.
@@ -19,7 +19,7 @@ Security note for `permissive`. Because `git` and `gh` run outside the sandbox, 
 - the extra denies block `-c`, `--config-env`, `--upload-pack`, `--receive-pack`, `--ext-diff`, `--textconv`, `--exec`, `grep -O` and global or system `git config` writes
 - `sandbox.filesystem.denyWrite` stops sandboxed commands from planting a pager, diff driver or hook in `.git/config`, `.git/hooks` or the user git config
 
-Path syntax in `denyWrite` (`./.git/...`) is unverified against the current sandbox docs, so check it before use. Some risk remains: a repository's checked-in `.gitattributes` can name a diff driver, but only `.git/config` can define one. Prefer `strict` unless a repository needs git outside the sandbox. A structural fix is open: keep git inside the sandbox (drop `git *` from `excludedCommands`) and allow writes only to the worktree backing-store paths.
+In a project's `.claude/settings.json`, `./.git` in `denyWrite` means that project's `.git` and everything under it; a single leading `/` would mean the filesystem root ([settings reference, sandbox path prefixes](https://code.claude.com/docs/en/settings-reference.md#sandbox-path-prefixes)). In a git worktree `.git` is a file pointing at the main repository's git folder, which this rule does not cover. Some risk remains: a repository's checked-in `.gitattributes` can name a diff driver, but only `.git/config` can define one. Prefer `strict` unless a repository needs git outside the sandbox. A structural fix is open: keep git inside the sandbox (drop `git *` from `excludedCommands`) and allow writes only to the worktree backing-store paths.
 
 Notes:
 - Permissions match command prefixes, and prefix rules miss `git -c …` and `cd x && git …`. The deny lists here are a convenience, not a guarantee. Guarantees belong in git hooks and remote branch protection.

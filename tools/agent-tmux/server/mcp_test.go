@@ -356,7 +356,7 @@ func sigpipeChild(dir string) int {
 	}
 	f := standardFake()
 	f.panes[0]["pane_current_path"] = src
-	s := NewServer(&gateRunner{f, filepath.Join(dir, "release")}, Home{PaneID: "%1", WindowID: "@1", SessionID: "$1"},
+	s := NewServer(&gateRunner{f, filepath.Join(dir, "release")}, Home{PaneID: "%1", SessionID: "$1"},
 		filepath.Join(dir, "agent-tmux.log"), log.New(os.Stderr, "", 0))
 	s.userHome = dir
 	if err := serveStdio(s); err != nil {

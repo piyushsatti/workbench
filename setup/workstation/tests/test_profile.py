@@ -94,7 +94,7 @@ class ProfileTests(unittest.TestCase):
             capture_output=True,
         ).stdout
         self.assertEqual(after, before)
-        self.assertEqual(len(before.splitlines()), 51)
+        self.assertEqual(len(before.splitlines()), 50)
 
     def test_full_profile_matches_the_installer_locks(self):
         full = PROFILES.expand(FULL, self.data)

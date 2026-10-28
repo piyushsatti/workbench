@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -36,6 +37,15 @@ def sync(root):
         WRITE.main(["--root", str(root / "pi"), "--source", str(root), "--apply"])
 
 
+def commit(repo):
+    """An empty commit in a fixture repo, made without this machine's git config or hooks; returns its sha."""
+    env = {"GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1", "HOME": str(repo), "PATH": os.environ["PATH"]}
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@example.com",
+                    "commit", "-q", "--allow-empty", "-m", "fixture"], check=True, env=env)
+    return subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"], capture_output=True, text=True,
+                          check=True).stdout.strip()
+
+
 def good_plugin(root, name="demo"):
     """A plugin that follows every rule: three manifests, hooks, MCP, a skill, install.json, catalogs."""
     plugin = root / name
@@ -56,7 +66,7 @@ def good_plugin(root, name="demo"):
     write(plugin / "VERIFIED.md", "# Verified\n")
     subprocess.run(["git", "init", "-q", str(plugin)], check=True)
     pi = root / "pi"
-    write(pi / "plugins.json", {"plugins": [{"name": name, "github": f"me/{name}", "sha": None}]})
+    write(pi / "plugins.json", {"plugins": [{"name": name, "github": f"me/{name}", "sha": commit(plugin)}]})
     sync(root)
     return plugin
 
@@ -159,15 +169,26 @@ class LintPluginsTests(unittest.TestCase):
     def test_remote_entries_point_at_the_listed_repo_and_pin(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            good_plugin(root)
+            sha = json.loads((good_plugin(root).parent / "pi/plugins.json").read_text())["plugins"][0]["sha"]
             catalog = json.loads((root / "pi/.claude-plugin/marketplace.json").read_text())
-            self.assertEqual(catalog["plugins"][0]["source"], {"source": "github", "repo": "me/demo"})
+            self.assertEqual(catalog["plugins"][0]["source"], {"source": "github", "repo": "me/demo", "sha": sha})
             codex = json.loads((root / "pi/.agents/plugins/marketplace.json").read_text())
-            self.assertEqual(codex["plugins"][0]["source"], {"source": "url", "url": "https://github.com/me/demo.git"})
-            write(root / "pi/plugins.json", {"plugins": [{"name": "demo", "github": "me/demo", "sha": "abc123"}]})
-            self.assert_error(root, "not pinned to plugins.json sha abc123")
+            self.assertEqual(codex["plugins"][0]["source"],
+                             {"source": "url", "url": "https://github.com/me/demo.git", "sha": sha})
+            newer = commit(root / "demo")
+            write(root / "pi/plugins.json", {"plugins": [{"name": "demo", "github": "me/demo", "sha": newer}]})
+            self.assert_error(root, f"not pinned to plugins.json sha {newer}")
             sync(root)
             self.assertEqual(self.run_lint(root)[0], 0)
+
+    def test_a_clone_away_from_its_pin_is_an_error(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            plugin = good_plugin(root)
+            pinned = json.loads((root / "pi/plugins.json").read_text())["plugins"][0]["sha"]
+            commit(plugin)  # a local commit past the pin, e.g. a version bump not pushed and pinned yet
+            self.assert_error(root, f"demo: the clone at {plugin} is at")
+            self.assert_error(root, f"plugins.json pins {pinned[:12]}")
 
     def test_third_party_plugins_are_checked_only_against_the_catalogs(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -177,11 +198,12 @@ class LintPluginsTests(unittest.TestCase):
             write(plugin / ".claude-plugin/plugin.json", {**base, "hooks": ["./hooks/a.json", "./hooks/b.json"]})
             write(plugin / ".codex-plugin/plugin.json", {**base, "hooks": "./hooks/a.json"})
             subprocess.run(["git", "init", "-q", str(plugin)], check=True)
-            write(root / "pi/plugins.json", {"owner": "me", "plugins": [{"name": "other", "github": "them/other", "sha": "abc123"}]})
+            sha = commit(plugin)
+            write(root / "pi/plugins.json", {"owner": "me", "plugins": [{"name": "other", "github": "them/other", "sha": sha}]})
             sync(root)
             status, output = self.run_lint(root)
             self.assertEqual(status, 0, output)
-            write(root / "pi/plugins.json", {"owner": "me", "plugins": [{"name": "other", "github": "me/other", "sha": "abc123"}]})
+            write(root / "pi/plugins.json", {"owner": "me", "plugins": [{"name": "other", "github": "me/other", "sha": sha}]})
             self.assert_error(root, "is not CalVer")
 
     def test_cursor_gets_no_catalog_and_no_copies(self):

@@ -80,7 +80,7 @@ It relies on a hook inheriting the session's environment. That holds unless `CLA
 | harness binaries | a harness binary is not on `PATH` | |
 | config dirs | | a harness's `CLAUDE_CONFIG_DIR` or `CODEX_HOME` does not exist |
 | wrappers | | `~/.bash_aliases` has no `<harness>() { workspaces run . <harness> ...; }` for a harness |
-| settings | | an entry of the protection list is missing from `~/.claude/settings.json` (read only); required and recommended are named separately |
+| settings | | an entry of the protection list is missing from `settings.json` (read only) in the folder each claude harness runs with (its `CLAUDE_CONFIG_DIR`, else `~/.claude`), one row per folder; required and recommended are named separately |
 | session hook | | no SessionStart hook runs `workspaces hook session-start` |
 | launch log | `launches.jsonl` (or the first folder that exists above it) is not writable | |
 | workspaces binary | | `workspaces` is not on `PATH`, or is not `~/.local/bin/workspaces` |

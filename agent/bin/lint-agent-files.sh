@@ -15,6 +15,20 @@ CODEX_POINTER="$HOME/.codex/AGENTS.md"
 ROOT="${AGENT_LINT_ROOT:-$HOME/Source}"
 # The workbench's agent/ holds the canonical AGENTS.md that deploys to $HOME_AGENT, not a project file.
 WORKBENCH_AGENT="$ROOT/workbench/agent"
+# Third-party plugin repos cloned beside the others (workbench plugins.json entries whose GitHub owner is not
+# the catalog's) follow their own conventions, so they are not linted.
+third_party=()
+while IFS= read -r name; do
+  [ -n "$name" ] && third_party+=( -o -path "$ROOT/$name" )
+done < <(python3 - "$ROOT/workbench/plugins.json" 2>/dev/null <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1]))
+for entry in data.get("plugins", []):
+    owner = entry.get("github", "").split("/")[0]
+    if data.get("owner") and owner and owner != data["owner"]:
+        print(entry["name"])
+PY
+)
 
 SECRETS='sk-[a-zA-Z0-9_-]{20,}|ghp_[a-zA-Z0-9]{20,}|AKIA[A-Z0-9]{16}|-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|(password|passwd|secret|token|api[_-]?key)[[:space:]]*[=:][[:space:]]*[^[:space:]]{8,}'
 
@@ -36,14 +50,15 @@ say() { # file check sev lane msg
 files=$( {
   ls "$HOME_AGENT" "$HOME_WRAPPER" "$CODEX_POINTER" "$ROOT/AGENTS.md" 2>/dev/null
   find "$ROOT" \
-    \( -path "$WORKBENCH_AGENT" -o -name node_modules -o -name .git -o -name dist -o -name artifacts \
+    \( -path "$WORKBENCH_AGENT" ${third_party[@]+"${third_party[@]}"} -o -name node_modules -o -name .git -o -name dist -o -name artifacts \
        -o -name worktrees -o -name .venv \
        -o -name template -o -name archive \
        -o -name "*snapshot*" \) -prune -o \
     \( -name AGENTS.md -o -name CLAUDE.md \) -print 2>/dev/null
 } | sort -u )
 
-for f in $files; do
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
   rel=${f#"$HOME"/}
   base=$(basename "$f")
 
@@ -123,7 +138,7 @@ for f in $files; do
      grep -qE '(^|[[:space:]])(pnpm|npm|yarn|pip3?) (install|-m pytest)|^## +(Build|Setup|Commands|Installation?) *$' "$f"; then
     say "$rel" "commands" "minor" "C" "move invocation(s) to README/CONTRIBUTING"
   fi
-done
+done <<< "$files"
 
 echo
 echo "queue: ${blockers} blocker(s), ${majors} major(s), ${minors} minor(s)"

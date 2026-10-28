@@ -9,4 +9,6 @@ Claude Code–specific harness pieces in workbench. `workbench deploy` installs 
 
 The two work together: the 5h and 7d limits show in the footer only when both are on. The status line needs `jq`.
 
+Tests: `python3 -B -m unittest discover -s harness/claude/statusline/tests` (the status line), and `claude plugin test` in a copy of `cc-status` (it writes type files).
+
 pm and tm live in ordinator; snippets is in `tools/snippets` ([decisions](../../docs/decisions.md#what-each-piece-is)).

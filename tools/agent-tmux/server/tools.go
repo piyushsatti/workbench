@@ -278,15 +278,15 @@ type paneRow struct {
 	PaneActive, Synced, InMode             bool
 	ClaudeState, Command, Cwd              string
 	SessionName, Name, Typed               string
-	// ShowsOwned, ShowsOwner and ShowsWinOwned are the tags as a -F format resolves them, inherited from window,
+	// ShowsOwned and ShowsOwner are the tags as a -F format resolves them, inherited from window,
 	// session, global and server options. tmux_list shows them; permission checks read the tags with paneOwned
 	// instead. ShowsOwned is the pre-2026.10.13 tag, exactly "1". ShowsOwner is the owner string.
-	ShowsOwned, ShowsWinOwned bool
-	ShowsOwner                string
+	ShowsOwned bool
+	ShowsOwner string
 }
 
 var listFields = []string{"session_id", "window_index", "window_id", "window_active", "window_last_flag", "window_linked",
-	"pane_index", "pane_id", "pane_active", ownedPaneOpt, ownedWindowOpt, "pane_synchronized", "@claude_state",
+	"pane_index", "pane_id", "pane_active", ownedPaneOpt, "pane_synchronized", "@claude_state",
 	"pane_current_command", "window_name", "pane_current_path", "pane_pid", "pane_in_mode",
 	"session_name", ownerOpt, nameOpt, typedOpt}
 
@@ -326,7 +326,7 @@ func (s *Server) listPanes(args ...string) ([]paneRow, error) {
 		errs = append(errs, e)
 		p.InMode, e = parseFlag(r["pane_in_mode"])
 		errs = append(errs, e)
-		p.ShowsOwned, p.ShowsWinOwned, p.ShowsOwner = r[ownedPaneOpt] == "1", r[ownedWindowOpt] == "1", r[ownerOpt]
+		p.ShowsOwned, p.ShowsOwner = r[ownedPaneOpt] == "1", r[ownerOpt]
 		p.ClaudeState, p.Command, p.WindowName, p.Cwd = r["@claude_state"], r["pane_current_command"], r["window_name"], r["pane_current_path"]
 		p.SessionName, p.Name, p.Typed = r["session_name"], r[nameOpt], r[typedOpt]
 		if err := errors.Join(errs...); err != nil {

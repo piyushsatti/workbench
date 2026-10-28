@@ -160,6 +160,8 @@ No manual action needed — your sessions survive shell restarts.
 
 ## Plugins Installed
 
+Each is installed at the commit pinned in `.chezmoidata/tmux_plugins.json`: by `chezmoi apply` on macOS and by Workstation on Ubuntu. `<prefix> I` and `<prefix> U` would move them to upstream HEAD, so they are not the way to install or update.
+
 1. **tpm** - Plugin manager
 2. **tmux-sensible** - Sensible defaults
 3. **vim-tmux-navigator** - Seamless vim/tmux navigation

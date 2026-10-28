@@ -72,6 +72,11 @@ class CliTest(unittest.TestCase):
     def test_slash_commands_get_nothing(self):
         self.run_("on", "verify")
         self.assertIsNone(self.hook("  /compact"))
+        self.assertIsNone(self.hook("/ponytail:ponytail-audit the repo"))
+
+    def test_a_prompt_starting_with_a_path_still_gets_snippets(self):
+        self.run_("on", "verify")
+        self.assertIsNotNone(self.hook("/Users/me/app/log.txt why does this crash?"))
 
     def test_off_and_off_all(self):
         self.run_("on", "verify", "kickoff")

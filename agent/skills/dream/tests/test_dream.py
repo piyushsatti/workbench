@@ -209,13 +209,15 @@ def memory_file(path, created, kind="feedback", body=None, extra=""):
     path.write_text(
         "---\n"
         f"name: {path.stem.split('_', 1)[-1]}\n"
+        f"id: {path.stem}\n"
         "description: one line\n"
         f"type: {kind}\n"
         f"created: {created}\n"
         f"last_updated: {created}\n"
-        "scope: {depth: 1, role: project}\n"
+        "scope: {key: workbench, depth: 1, role: project}\n"
         "genericity: specific\n"
-        "schema_version: 2\n"
+        "provenance: a session\n"
+        "status: active\n"
         f"{extra}"
         "---\n" + body
     )
@@ -248,6 +250,15 @@ class CatalogTest(HomeCase):
         self.assertEqual(by_file[f"{old}-feedback_gone.md"][1], "archive")
         self.assertEqual(by_file[f"{old}-feedback_gone.md"][7], "")
 
+    def test_a_missing_recall_log_means_nothing_recalled(self):
+        # First run: SKILL.md stage 3 passes <state>/recall.next.tsv before any commit has written recall.tsv.
+        projects = self.home / ".claude/projects"
+        old = (datetime.datetime.now(datetime.UTC).date() - datetime.timedelta(days=90)).isoformat()
+        memory_file(projects / "-a/memory" / f"{old}-feedback_old.md", old)
+        code, printed = run_quiet(catalog.main, projects, [str(self.home / "state/recall.next.tsv")])
+        self.assertEqual(code, 0)
+        self.assertEqual(printed.splitlines()[1].split("\t")[7], "stale")
+
 
 class LintTest(HomeCase):
     def setUp(self):
@@ -277,12 +288,26 @@ class LintTest(HomeCase):
         self.assertIn("[[nowhere]] matches no memory", printed)
         self.assertIn("WARN  2026-10-03-project_gamma.md: no **Why:**", printed)
 
+    def test_a_file_in_the_older_format_only_warns(self):
+        path = self.store / "2026-10-05-reference_old.md"
+        path.write_text("---\nname: old\ndescription: d\ntype: reference\ncreated: 2026-10-05\n"
+                        "last_updated: 2026-10-05\nscope: {depth: 1, role: project}\ngenericity: specific\n"
+                        "schema_version: 2\n---\nBody\n")
+        with (self.store / "MEMORY.md").open("a") as index:
+            index.write("- [Old](2026-10-05-reference_old.md) — an older file\n")
+        code, printed = run_quiet(lint.main, str(self.store))
+        self.assertEqual(code, 0, printed)
+        for field in ("id", "provenance", "status"):
+            self.assertIn(f"WARN  2026-10-05-reference_old.md: missing rulebook field {field}", printed)
+        self.assertIn("WARN  2026-10-05-reference_old.md: scope has no key", printed)
+
     def test_metadata_type_and_fields_are_accepted(self):
         path = self.store / "archive/2026-10-04-user_delta.md"
         path.parent.mkdir()
         path.write_text(
             "---\nname: delta\ndescription: d\nmetadata:\n  type: user\n  created: 2026-10-04\n"
-            "  last_updated: 2026-10-04\n  scope: x\n  genericity: specific\n  schema_version: 2\n---\nBody\n"
+            "  last_updated: 2026-10-04\n  scope: {key: x, depth: 1, role: project}\n  genericity: specific\n"
+            "  id: 2026-10-04-user_delta\n  provenance: p\n  status: active\n---\nBody\n"
         )
         code, printed = run_quiet(lint.main, str(self.store))
         self.assertEqual(code, 0, printed)

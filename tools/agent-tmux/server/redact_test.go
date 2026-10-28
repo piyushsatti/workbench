@@ -46,6 +46,15 @@ func TestRedact(t *testing.T) {
 		// several, and Bearer
 		{"several", "PASSWORD=a TOKEN=b curl -u x https://u:p@h --password c", "PASSWORD=*** TOKEN=*** curl -u x https://u:***@h --password ***"},
 		{"bearer", `curl -H "Authorization: Bearer abc123def456"`, `curl -H "Authorization: Bearer ***"`},
+		// From the 2026-10-27 audit: each of these was written unmasked before.
+		{"url token as user", "git clone https://ghp_abc123@github.com/o/r.git", "git clone https://***@github.com/o/r.git"},
+		{"--access-token", "tool --access-token abc123 run", "tool --access-token *** run"},
+		{"--auth-token=", "tool --auth-token=abc123", "tool --auth-token=***"},
+		{"--client-secret", "tool --client-secret abc123", "tool --client-secret ***"},
+		{"curl -u user:pass", "curl -u bob:s3cret https://h", "curl -u bob:*** https://h"},
+		{"--user=user:pass", "curl --user=bob:s3cret https://h", "curl --user=bob:*** https://h"},
+		{"authorization token", `curl -H "Authorization: token abc123" h`, `curl -H "Authorization: token ***" h`},
+		{"--bypass is not a password flag", "tool --bypass x", "tool --bypass x"},
 		// plain text and known over-redaction
 		{"plain", "ls -la /tmp && echo done", "ls -la /tmp && echo done"},
 		{"empty", "", ""},

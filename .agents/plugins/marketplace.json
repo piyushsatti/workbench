@@ -17,26 +17,6 @@
       "category": "Productivity"
     },
     {
-      "name": "rpctool",
-      "description": "Shrinks large tool results to head and tail with the full text saved to a file, and runs commands on allowlisted hosts over ssh through an MCP server",
-      "version": "2026.10.22",
-      "source": {
-        "source": "url",
-        "url": "https://github.com/piyushsatti/rpctool.git"
-      },
-      "category": "Developer Tools"
-    },
-    {
-      "name": "ordinator",
-      "description": "Execution orchestration for a fleet of implementation sessions: one orchestrator skill that launches, relays and records; one implementation skill per ticket that plans, builds, reviews and opens a draft PR through the ticket-pr workflow; eleven stage agents with narrow tool surfaces. Configured per project by the setup skill.",
-      "version": "2026.10.22",
-      "source": {
-        "source": "url",
-        "url": "https://github.com/piyushsatti/ordinator.git"
-      },
-      "category": "Coding"
-    },
-    {
       "name": "agent-tmux",
       "description": "Stdio MCP server that lets an agent see and lay out its own tmux session: list, capture, new windows and splits, wait for output, and type into panes it owns without pressing Enter",
       "version": "2026.10.22",

@@ -48,8 +48,12 @@ def _frontmatter(text: str) -> dict:
 
 def _recalls(logs: list[str]) -> dict[tuple[str, str], str]:
     latest: dict[tuple[str, str], str] = {}
+    # recall.next.tsv (old rows plus this run's) is what stage 3 reads; on a first run before
+    # `dream-replay run` there may be no log at all, which means nothing was recalled yet.
     for log in logs:
-        for row in Path(log).read_text().splitlines():
+        if not Path(log).is_file():
+            continue
+        for row in filter(None, Path(log).read_text().splitlines()):
             date, _, _, store, name = row.split("\t")
             latest[store, name] = max(date, latest.get((store, name), ""))
     return latest

@@ -4,6 +4,7 @@ The root launcher installs system packages, then runs this as SUDO_USER.
 Only explicitly managed files are replaced; their old contents are recoverable.
 """
 
+import grp
 import hashlib
 import importlib.util
 import io
@@ -24,7 +25,6 @@ HOME = Path.home()
 STATE = HOME / ".local/state/workstation"
 DATA = HOME / ".local/share/workstation"
 VERSIONS = json.loads((PROFILE / "versions.json").read_text())
-PLUGINS = json.loads((PROFILE / "plugins.json").read_text())
 EXTENSIONS = json.loads((PROFILE / "extensions.json").read_text())
 RUN = None
 REPORT = {"status": "running", "stages": [], "pending": [], "failed": []}
@@ -58,18 +58,23 @@ def select_profile(name=None):
     return expansion
 
 
+def selected():
+    """The selected profile's expansion, selecting the default one on first use."""
+    return SELECTED or select_profile()
+
+
 def has(module):
-    return module in (SELECTED or select_profile())["modules"]
+    return module in selected()["modules"]
 
 
 def dotfiles_locked():
     """Whether this profile applies a locked Dotfiles render."""
-    return has("shell") and (SELECTED or select_profile())["dotfiles_lock"] is not None
+    return has("shell") and selected()["dotfiles_lock"] is not None
 
 
 def dotfiles_lock():
     """The selected profile's Dotfiles lock: its exact targets and their rendered digest."""
-    return json.loads((ROOT / (SELECTED or select_profile())["dotfiles_lock"]).read_text())
+    return json.loads((ROOT / selected()["dotfiles_lock"]).read_text())
 
 
 def pending(note):
@@ -315,18 +320,13 @@ def checkout(name, url, commit):
         except subprocess.CalledProcessError:
             head = None
         if head != commit:
-            if RUN is not None:
-                recovery = RUN / "incomplete-checkouts" / name / commit
-                recovery.parent.mkdir(parents=True, exist_ok=True)
-                if recovery.exists() or recovery.is_symlink():
-                    raise RuntimeError(f"Recovery collision at {recovery}")
-                target.rename(recovery)
-            elif head is None and {entry.name for entry in target.iterdir()} == {
-                ".git"
-            }:
-                shutil.rmtree(target)
-            else:
-                raise RuntimeError(f"Incomplete checkout requires recovery directory: {target}")
+            if RUN is None:
+                raise RuntimeError("Recovery directory is not initialized")
+            recovery = RUN / "incomplete-checkouts" / name / commit
+            recovery.parent.mkdir(parents=True, exist_ok=True)
+            if recovery.exists() or recovery.is_symlink():
+                raise RuntimeError(f"Recovery collision at {recovery}")
+            target.rename(recovery)
     if (target / ".git").exists():
         if run(
             "git",
@@ -387,9 +387,9 @@ def chezmoi_tool():
 
 
 def cli_path(name):
-    """Where an installed CLI is, or None: ~/.local/bin first, then PATH."""
+    """Where an installed CLI is, or None: ~/.local/bin first, then PATH. A dangling symlink is not one."""
     local = HOME / ".local/bin" / name
-    if local.exists() or local.is_symlink():
+    if local.exists():
         return local
     found = shutil.which(name)
     return Path(found) if found else None
@@ -408,25 +408,34 @@ HARNESS_PACKAGES = {"claude": "@anthropic-ai/claude-code", "codex": "@openai/cod
 
 def harnesses():
     """The agent CLIs the selected profile lists under `harnesses:` in defaults.yml."""
-    names = (SELECTED or select_profile())["harnesses"]
+    names = selected()["harnesses"]
     unknown = [name for name in names if name not in HARNESS_PACKAGES]
     if unknown:
         raise RuntimeError(f"No npm package known for harness: {', '.join(unknown)}")
     return names
 
 
+def npm_wrapper(target):
+    """The ~/.local/bin script this installer writes for an agent CLI it installed with npm."""
+    return f'#!/bin/sh\nexec "{target}" "$@"\n'
+
+
 def harness_clis():
-    """Install the latest agent CLIs that are missing; never replace one already installed."""
+    """Install the latest agent CLIs that are missing; never replace one already installed. Our own wrapper
+    whose npm install is gone (say ~/.local/share/workstation was cleared) counts as missing, so it is repaired."""
+    npm_dir = DATA / "npm"
     missing = []
     for name in harnesses():
         path = cli_path(name)
-        if path:
+        target = npm_dir / "node_modules/.bin" / name
+        ours_broken = (path == HOME / ".local/bin" / name and not target.exists()
+                       and path.read_text(errors="replace") == npm_wrapper(target))
+        if path and not ours_broken:
             keep(name, path)
         else:
             missing.append(name)
     if not missing:
         return
-    npm_dir = DATA / "npm"
     npm_dir.mkdir(parents=True, exist_ok=True)
     # Native-package postinstall scripts run only as the workstation user.
     run("npm", "install", "--no-audit", "--no-fund", "--prefix", npm_dir,
@@ -435,7 +444,7 @@ def harness_clis():
         target = npm_dir / "node_modules/.bin" / name
         if not target.exists():
             raise RuntimeError(f"Missing installed CLI: {name}")
-        write(HOME / ".local/bin" / name, f'#!/bin/sh\nexec "{target}" "$@"\n', 0o755)
+        write(HOME / ".local/bin" / name, npm_wrapper(target), 0o755)
 
 
 def uv_tool():
@@ -457,7 +466,7 @@ def installed_claude_plugins(claude):
 
 def claude_plugins():
     """Install the profile's Claude plugins that are missing; an installed one is left as is."""
-    wanted = (SELECTED or select_profile())["claude_plugins"]
+    wanted = selected()["claude_plugins"]
     claude = cli_path("claude")
     if not wanted or not claude:
         return
@@ -473,8 +482,13 @@ def claude_plugins():
         run(claude, "plugin", "install", "--scope", "user", plugin, timeout=600)
 
 
+def pinned_plugins():
+    """The tmux plugin commits. They live in the Dotfiles' chezmoi data, which the Mac's install script reads too."""
+    return json.loads((resolve_dotfiles_source() / ".chezmoidata/tmux_plugins.json").read_text())["tmuxPlugins"]
+
+
 def plugins():
-    for plugin in PLUGINS:
+    for plugin in pinned_plugins():
         source = checkout(
             plugin["name"], f"https://github.com/{plugin['repo']}.git", plugin["commit"]
         )
@@ -627,6 +641,11 @@ def agent_seeds():
     )
 
 
+def installed_extensions():
+    """VS Code's installed extensions as lower-case id@version strings."""
+    return set(run("code", "--list-extensions", "--show-versions", capture=True).lower().splitlines())
+
+
 def vscode():
     # Install explicit dependencies first, preventing Code from choosing a newer
     # transitive version before our pinned version is installed.
@@ -651,11 +670,7 @@ def vscode():
 
     for item in EXTENSIONS:
         visit(item)
-    installed = set(
-        run("code", "--list-extensions", "--show-versions", capture=True)
-        .lower()
-        .splitlines()
-    )
+    installed = installed_extensions()
     for extension in ordered:
         spec = f"{extension['id']}@{extension['version']}"
         if spec.lower() not in installed:
@@ -702,13 +717,26 @@ def check_tmux_boot(config_text, profile):
         raise RuntimeError(f"tmux automatic boot for {profile} must be {expected}, found {found or 'none'}")
 
 
+TMUX_PLUGIN = re.compile(r"^set -g @plugin '([^']+)'$", re.MULTILINE)
+TPM_RUN = "run '~/.tmux/plugins/tpm/tpm'"
+
+
 def isolated_tmux_config(config_text):
-    """The config for the throwaway check server: no restore and no boot hook, so it touches nothing real."""
-    return (
-        config_text
-        .replace("set -g @continuum-restore 'on'", "set -g @continuum-restore 'off'")
-        .replace("set -g @continuum-boot 'on'", "set -g @continuum-boot 'off'")
-    )
+    """The config for the throwaway check server, which must touch nothing real.
+
+    tmux-continuum must not load there: it restores sessions, and on load it turns the user's boot unit on or
+    off (`systemctl --user disable` when boot is off). Changing its options here is not enough, and neither is
+    dropping its @plugin line, because tpm reads the plugin list from ~/.tmux.conf on disk, not from this file.
+    So tpm's run line is replaced by running every other plugin's *.tmux files directly, as tpm would.
+    """
+    names = [plugin.split("#")[0].rstrip("/").rsplit("/", 1)[-1].removesuffix(".git")
+             for plugin in TMUX_PLUGIN.findall(config_text)]
+    runs = [f"""run 'for f in ~/.tmux/plugins/{name}/*.tmux; do "$f"; done'"""
+            for name in names if name not in ("tpm", "tmux-continuum")]
+    lines = []
+    for line in config_text.splitlines():
+        lines.extend(runs if line.strip() == TPM_RUN else [line])
+    return "\n".join(lines) + "\n"
 
 
 # The VS Code stage adds the Continue extension's machine-specific `yaml.schemas` entry to the locked
@@ -843,9 +871,24 @@ def installed_clis():
     return (["uv"] if has("dev") else []) + (harnesses() if has("agents") else [])
 
 
+DOCKER_RELOGIN = "You are in the docker group, but this session started before you joined it: log out and in for Docker access."
+
+
+def docker_group_pending():
+    """In the docker group's member list, but not in this process's groups: a new terminal is not a new
+    login, so `docker info` would fail here with a socket permission error on a correctly installed machine."""
+    try:
+        group = grp.getgrnam("docker")
+    except KeyError:
+        return False
+    user = os.environ.get("USER") or os.environ.get("LOGNAME", "")
+    return user in group.gr_mem and group.gr_gid not in os.getgroups()
+
+
 def verify():
     checks = []
-    for package in (SELECTED or select_profile())["apt"]:
+    docker_note = None
+    for package in selected()["apt"]:
         status = run("dpkg-query", "-W", "-f=${Status}", package, capture=True).strip()
         if status != "install ok installed":
             raise RuntimeError(f"System package not installed: {package} ({status or 'unknown'})")
@@ -860,7 +903,7 @@ def verify():
             raise RuntimeError(f"Missing CLI: {command}")
         versions.append(run(path, "--version", capture=True).strip().splitlines()[0])
     checks.append("development tools" + (f" and {', '.join(versions)}" if versions else ""))
-    wanted = (SELECTED or select_profile())["claude_plugins"]
+    wanted = selected()["claude_plugins"]
     if wanted:
         missing = sorted(set(wanted) - installed_claude_plugins(cli_path("claude")))
         if missing:
@@ -870,12 +913,16 @@ def verify():
         run("docker", "compose", "version", capture=True)
         run("docker", "buildx", "version", capture=True)
         if run("ps", "-p", "1", "-o", "comm=", capture=True).strip() == "systemd":
-            run("docker", "info", "--format", "{{.ServerVersion}}", capture=True)
-            checks.append("Docker daemon access, Compose and Buildx")
+            if docker_group_pending():
+                docker_note = DOCKER_RELOGIN
+                checks.append("Docker Compose and Buildx; daemon access waits for a new login")
+            else:
+                run("docker", "info", "--format", "{{.ServerVersion}}", capture=True)
+                checks.append("Docker daemon access, Compose and Buildx")
         else:
             checks.append("Docker Compose and Buildx; daemon requires a systemd host")
     if has("tmux"):
-        for plugin in PLUGINS:
+        for plugin in pinned_plugins():
             marker = HOME / ".tmux/plugins" / plugin["name"] / ".workstation-revision"
             if marker.read_text().strip() != plugin["commit"]:
                 raise RuntimeError(f"Plugin mismatch: {plugin['name']}")
@@ -919,11 +966,7 @@ def verify():
         if "Nerd Font" not in family:
             raise RuntimeError("Nerd Font selection fell back to another font")
         checks.append("actual Nerd Font resolution")
-        installed = set(
-            run("code", "--list-extensions", "--show-versions", capture=True)
-            .lower()
-            .splitlines()
-        )
+        installed = installed_extensions()
         missing = [
             f"{e['id']}@{e['version']}"
             for e in EXTENSIONS
@@ -948,6 +991,8 @@ def verify():
         )
     if has("shell") and not dotfiles_locked():
         REPORT["pending"].append(NO_DOTFILES_LOCK)
+    if docker_note:
+        REPORT["pending"].append(docker_note)
     save_report()
     for check in checks:
         print(f"PASS {check}")

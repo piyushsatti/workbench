@@ -46,6 +46,34 @@ class DeployAgentTests(unittest.TestCase):
             self.assertTrue((home / ".claude/agents/scrutineer.md").is_file())
             self.assertIn("up to date", self.run_main(home))
 
+    def test_every_overwrite_backs_up_what_it_replaces(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            self.run_main(home, "--harness", "claude", "--apply")
+            deployed = home / ".claude/agents/scrutineer.md"
+            deployed.write_text("first hand edit\n")
+            self.run_main(home, "--harness", "claude", "--apply")
+            deployed.write_text("second hand edit\n")
+            self.run_main(home, "--harness", "claude", "--apply")
+            self.assertEqual((home / ".claude/agents/scrutineer.md.pre-deploy").read_text(), "first hand edit\n")
+            self.assertEqual((home / ".claude/agents/scrutineer.md.pre-deploy.last").read_text(), "second hand edit\n")
+
+    def test_a_third_party_plugins_install_json_is_never_read(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root, source = Path(temp) / "workbench", Path(temp) / "src"
+            root.mkdir()
+            (root / "plugins.json").write_text(json.dumps({"owner": "me", "plugins": [
+                {"name": "mine", "github": "me/mine", "sha": "a"}, {"name": "theirs", "github": "them/theirs", "sha": "b"}]}))
+            for name in ("mine", "theirs"):
+                (source / name / "bin").mkdir(parents=True)
+                (source / name / "bin" / name).write_text("#!/bin/sh\n")
+                (source / name / "install.json").write_text(json.dumps(
+                    {"files": [{"src": f"bin/{name}", "dest": f"~/.local/bin/{name}", "mode": "0755"}]}))
+            with mock.patch.object(MODULE.plugin_repos, "ROOT", root), mock.patch.dict("os.environ", {"PI_SOURCE": str(source)}):
+                dests = {dst.name for _, dst, _ in MODULE.plugin_installs()[0]}
+            self.assertIn("mine", dests)
+            self.assertNotIn("theirs", dests)
+
     def test_hand_edited_shared_rules_are_never_overwritten(self):
         with tempfile.TemporaryDirectory() as temp:
             home = Path(temp)
@@ -144,6 +172,29 @@ class DeployAgentTests(unittest.TestCase):
                 self.assertFalse((home / ".local/bin/demo").exists())
                 self.run_main(home, "--apply")
             self.assertEqual((home / ".local/bin/demo").stat().st_mode & 0o777, 0o755)
+
+    def test_install_json_cannot_reach_outside_home_or_its_repo(self):
+        for entry in ({"src": "bin/demo", "dest": "/etc/cron.d/demo"},
+                      {"src": "bin/demo", "dest": "~/../../tmp/demo"},
+                      {"src": "../../secret", "dest": "~/.local/bin/demo"}):
+            with self.subTest(entry=entry), tempfile.TemporaryDirectory() as temp:
+                home, plugins = Path(temp) / "home", Path(temp) / "plugins"
+                home.mkdir()
+                (plugins / "demo/bin").mkdir(parents=True)
+                (plugins / "demo/install.json").write_text(json.dumps({"files": [entry]}))
+                with mock.patch.object(MODULE, "PLUGINS", plugins), mock.patch.object(MODULE, "HOME", home):
+                    with self.assertRaises(SystemExit):
+                        MODULE.plugin_installs()
+
+    def test_install_json_mode_may_be_a_number(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home, plugins = Path(temp) / "home", Path(temp) / "plugins"
+            home.mkdir()
+            (plugins / "demo/bin").mkdir(parents=True)
+            (plugins / "demo/install.json").write_text(
+                '{"files": [{"src": "bin/demo", "dest": "~/.local/bin/demo", "mode": 755}]}')
+            with mock.patch.object(MODULE, "PLUGINS", plugins), mock.patch.object(MODULE, "HOME", home):
+                self.assertEqual(MODULE.plugin_installs()[0][0][2], 0o755)
 
     def test_git_guard_installs_from_agent_hooks(self):
         with tempfile.TemporaryDirectory() as temp:

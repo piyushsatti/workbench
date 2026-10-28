@@ -5,7 +5,7 @@ name in profiles/ubuntu-26.04/apt.txt and install at the version Ubuntu offers, 
 updates never leave the list stale. Ubuntu dependency licenses remain available under
 /usr/share/doc/PACKAGE/copyright on the target. CLIs that update themselves are installed at
 their latest version only when missing; one already installed is kept. Pins remain for
-downloads checked against a checksum (versions.json), tmux plugin commits (plugins.json) and
+downloads checked against a checksum (versions.json), tmux plugin commits (Dotfiles' .chezmoidata/tmux_plugins.json, shared with the Mac) and
 VS Code extension versions (extensions.json).
 
 | Software | Pin | License and choice |
@@ -17,7 +17,7 @@ VS Code extension versions (extensions.json).
 | OpenCode | latest when missing | MIT; installed with restrictive initial permissions, never launched as an agent by the installer |
 | VS Code | Not pinned: installed by name from the Microsoft apt repository, at the version it offers | Microsoft binary distribution terms; deliberate existing editor choice |
 | JetBrainsMono Nerd Font | 3.4.0 archive | SIL OFL-1.1, retained in installed font directory |
-| tmux plugins | Exact commits in plugins.json, one for each `@plugin` in the Dotfiles tmux config (a test checks both ways); tmux-resurrect gets the local patches in Dotfiles' .patches/ | MIT except SessionX GPL-3.0; toggle-popup license metadata is unclassified; the licenses of nordtheme/tmux, tmux-prefix-highlight and tmux-claude-resurrect are not yet recorded. Upstream notices retained |
+| tmux plugins | Exact commits in Dotfiles' .chezmoidata/tmux_plugins.json, one for each `@plugin` in the Dotfiles tmux config (a test checks both ways); tmux-resurrect gets the local patches in Dotfiles' .patches/ | MIT except SessionX GPL-3.0; toggle-popup license metadata is unclassified; the licenses of nordtheme/tmux, tmux-prefix-highlight and tmux-claude-resurrect are not yet recorded. Upstream notices retained |
 
 ## VS Code extensions
 

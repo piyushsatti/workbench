@@ -36,33 +36,23 @@ CATPPUCCIN_BTOP_SHA256 = "4c7469ab9bda282c1ff606aca37c9c0b84cd0cb66d041e4e7e1fed
 PROFILES = (("linux", "linux"), ("linux", "linux-full"), ("darwin", None))
 
 
+def archive_files(archive):
+    """name -> bytes for each file in a `chezmoi archive` tarball."""
+    with tarfile.open(fileobj=io.BytesIO(archive), mode="r:*") as bundle:
+        return {m.name: bundle.extractfile(m).read() for m in bundle.getmembers() if m.isfile()}
+
+
 @unittest.skipUnless(CHEZMOI, "chezmoi is required for render tests")
 class RenderTests(unittest.TestCase):
     def render(self, os_name, profile=None):
         if os_name != "darwin" and profile is None:
             profile = "linux"
-        with tempfile.TemporaryDirectory(prefix="dotfiles-render-") as home:
-            data = {"chezmoi": {"os": os_name}}
-            if profile:
-                data["workstation"] = {"profile": profile}
-            archive = subprocess.run(
-                [
-                    CHEZMOI,
-                    "--source",
-                    str(ROOT),
-                    "--destination",
-                    home,
-                    "--config",
-                    "/dev/null",
-                    "--config-format",
-                    "toml",
-                    "--override-data",
-                    json.dumps(data),
-                    "archive",
-                ],
-                check=True,
-                stdout=subprocess.PIPE,
-            ).stdout
+        data = {"chezmoi": {"os": os_name}}
+        if profile:
+            data["workstation"] = {"profile": profile}
+        result = self.raw_archive(data)
+        result.check_returncode()
+        archive = result.stdout
         files = {}
         modes = {}
         with tarfile.open(fileobj=io.BytesIO(archive), mode="r:*") as bundle:
@@ -77,7 +67,6 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(
             set(files),
             {
-                "10-install-tpm.sh",
                 "20-patch-tmux-resurrect.sh",
                 ".bash_aliases",
                 ".bash_profile",
@@ -107,6 +96,17 @@ class RenderTests(unittest.TestCase):
         self.assertIn("set -g @continuum-restore 'on'", tmux)
         self.assertIn("bind S display-popup", tmux)
 
+    def test_mac_installs_each_tmux_plugin_at_its_pinned_commit(self):
+        pins = json.loads((ROOT / ".chezmoidata/tmux_plugins.json").read_text())["tmuxPlugins"]
+        configured = re.findall(r"^set -g @plugin '([^']+)'$", (ROOT / "dot_tmux.conf.tmpl").read_text(), re.MULTILINE)
+        self.assertEqual(sorted(configured), sorted(p["repo"] for p in pins))
+        files, _ = self.render("darwin")
+        script = files["10-install-tmux-plugins.sh"]
+        subprocess.run(["sh", "-n"], input=script, check=True)
+        for p in pins:
+            self.assertIn(f'pin "{p["name"]}" "{p["repo"]}" "{p["commit"]}"', script.decode())
+        self.assertNotIn("10-install-tmux-plugins.sh", self.render("linux", "linux-full")[0])
+
     def test_headless_linux_profile_is_a_small_override_without_gui_settings(self):
         default, _ = self.render("linux", "linux-full")
         profile, _ = self.render("linux", "linux")
@@ -126,15 +126,9 @@ class RenderTests(unittest.TestCase):
         data = json.loads(json.dumps(data))
         if data.get("chezmoi", {}).get("os") != "darwin" and "profile" not in data.get("workstation", {}):
             data.setdefault("workstation", {})["profile"] = "linux"
-        with tempfile.TemporaryDirectory(prefix="dotfiles-render-") as home:
-            archive = subprocess.run(
-                [CHEZMOI, "--source", str(ROOT), "--destination", home, "--config", "/dev/null",
-                 "--config-format", "toml", "--override-data", json.dumps(data), "archive"],
-                check=True,
-                stdout=subprocess.PIPE,
-            ).stdout
-        with tarfile.open(fileobj=io.BytesIO(archive), mode="r:*") as bundle:
-            return {m.name: bundle.extractfile(m).read() for m in bundle.getmembers() if m.isfile()}
+        result = self.raw_archive(data)
+        result.check_returncode()
+        return archive_files(result.stdout)
 
     def raw_archive(self, data, env=None):
         with tempfile.TemporaryDirectory(prefix="dotfiles-render-") as home:
@@ -158,10 +152,7 @@ class RenderTests(unittest.TestCase):
         env = {**__import__("os").environ, "WORKSTATION_PROFILE": "linux"}
         actual = self.raw_archive({"chezmoi": {"os": "linux"}, "theme": "nord"}, env)
         self.assertEqual(actual.returncode, 0, actual.stderr)
-        def contents(result):
-            with tarfile.open(fileobj=io.BytesIO(result.stdout), mode="r:*") as bundle:
-                return {m.name: bundle.extractfile(m).read() for m in bundle.getmembers() if m.isfile()}
-        self.assertEqual(contents(actual), contents(expected))
+        self.assertEqual(archive_files(actual.stdout), archive_files(expected.stdout))
 
     def test_linux_full_profile_keeps_the_tmux_behaviour(self):
         files, modes = self.render("linux", "linux-full")
@@ -176,6 +167,14 @@ class RenderTests(unittest.TestCase):
         self.assertNotIn("@claude-resurrect-claude-dir", tmux)
         self.assertEqual(modes[".tmux/claude/pane-title.sh"], 0o755)
         self.assertTrue(files[".tmux/claude/pane-title.sh"].startswith(b"#!/usr/bin/env bash\n#"))
+
+    def test_editor_is_installed_on_each_profile(self):
+        # The headless linux profile has no VS Code, so `code --wait` there broke git commit and crontab -e.
+        for os_name, profile, editor in (("linux", "linux", "nvim"), ("linux", "linux-full", "code --wait"),
+                                         ("darwin", None, "code --wait")):
+            bashrc = self.render(os_name, profile)[0][".bashrc"].decode()
+            self.assertIn(f'export EDITOR="{editor}"', bashrc, profile)
+            self.assertIn(f'export VISUAL="{editor}"', bashrc, profile)
 
     def test_rendered_files_carry_no_home_paths(self):
         for theme in ("nord", "catppuccin-mocha"):

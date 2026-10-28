@@ -11,7 +11,7 @@ from pathlib import Path
 
 TYPES = {"user", "feedback", "project", "reference"}
 REQUIRED = ("name", "description", "type")
-RULEBOOK_FIELDS = ("created", "last_updated", "scope", "genericity", "schema_version")
+RULEBOOK_FIELDS = ("id", "created", "last_updated", "scope", "genericity", "provenance", "status")
 FILENAME = re.compile(
     r"^\d{4}-\d{2}-\d{2}-(user|feedback|project|reference)_[a-z0-9-]+\.md$"
 )
@@ -72,6 +72,9 @@ def main(directory):
             # The harness moves these under metadata: when it saves a memory.
             if key not in fields and f"metadata.{key}" not in fields:
                 warns.append(f"{path.name}: missing rulebook field {key}")
+        scope = fields.get("scope") or fields.get("metadata.scope")
+        if scope is not None and "scope.key" not in fields and not re.search(r"\bkey:", scope):
+            warns.append(f"{path.name}: scope has no key")
         if not FILENAME.match(path.name):
             warns.append(f"{path.name}: filename is not <created>-<type>_<slug>.md")
         body = path.read_text()

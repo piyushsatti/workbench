@@ -65,7 +65,7 @@ mappings, and no values that YAML would read as booleans or numbers.
 | defaults.yml | Profiles, their modules and each module's package names |
 | scripts/profile.py | Expands a profile into modules and locked apt entries (standard library only) |
 | scripts/workstation.py | User-owned tools, pinned plugins, locked canonical Dotfiles render, Nerd Font, VS Code extensions, checks |
-| profiles/ubuntu-26.04/ | Apt package names (apt.txt), tmux plugin commits (plugins.json), VS Code extension IDs/versions (extensions.json), chezmoi and font download pins (versions.json) |
+| profiles/ubuntu-26.04/ | Apt package names (apt.txt), VS Code extension IDs/versions (extensions.json), chezmoi and font download pins (versions.json) |
 | profiles/ubuntu-26.04/dotfiles.lock.json, dotfiles.linux.lock.json | exact target set and rendered-content lock of the Dotfiles for `linux-full` and `linux` |
 | tests/ | Recovery tests and complete Ubuntu integration build |
 

@@ -30,11 +30,6 @@ missing, starting from the built-in claude harness.
 
 var envKeyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
-func knownAdapter(name string) bool {
-	_, ok := harness.Lookup(name)
-	return ok
-}
-
 func (a *App) harnessCmd(args []string) int {
 	return a.dispatch("harness", usageHarness, []verb{
 		{"list", a.harnessList}, {"add", a.harnessAdd}, {"rm", a.harnessRm},
@@ -54,7 +49,7 @@ func (a *App) harnessList(args []string) int {
 	_, path, err := a.configPaths()
 	var hs *config.Harnesses
 	if err == nil {
-		hs, err = config.LoadHarnesses(path, a.home(), knownAdapter)
+		hs, err = config.LoadHarnesses(path, a.home(), harness.Known)
 	}
 	if err != nil {
 		return a.fail(exitConfig, "%v", err)

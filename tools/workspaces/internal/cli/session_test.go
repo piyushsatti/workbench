@@ -12,6 +12,7 @@ import (
 
 	"workspaces/internal/launchlog"
 	"workspaces/internal/picker"
+	"workspaces/internal/sessions"
 )
 
 var sessionBase = time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
@@ -977,5 +978,24 @@ func TestSessionConfigErrors(t *testing.T) {
 	os.Remove(filepath.Join(f.home, ".config/workspaces/spaces.json"))
 	if code := f.run("session", "list", "a"); code != exitConfig {
 		t.Errorf("no spaces.json: exit %d, want %d", code, exitConfig)
+	}
+}
+
+func TestDeleteSessionRefusesANameThatIsNotAnID(t *testing.T) {
+	projects := filepath.Join(t.TempDir(), "projects")
+	project := filepath.Join(projects, "p")
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	other := filepath.Join(projects, "other", "keep.jsonl")
+	os.MkdirAll(filepath.Dir(other), 0o755)
+	os.WriteFile(other, []byte("{}"), 0o644)
+	path := filepath.Join(project, "...jsonl") // a transcript named ...jsonl reads as id ".."
+	os.WriteFile(path, []byte("{}"), 0o644)
+	if _, err := deleteSession(sessions.Session{ID: "..", Path: path}); err == nil {
+		t.Error("deleteSession accepted id \"..\"")
+	}
+	if !exists(other) || !exists(path) {
+		t.Error("deleteSession removed files for id \"..\"")
 	}
 }

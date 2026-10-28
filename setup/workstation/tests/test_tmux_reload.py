@@ -111,6 +111,8 @@ class LockedTmuxConfigTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        # Named, not taken from $WORKSTATION_PROFILE: these tests read the linux-full config.
+        MODULE.select_profile("linux-full")
         _, rendered, _ = MODULE.render_dotfiles()
         cls.config = rendered[".tmux.conf"][0].decode()
 
@@ -121,11 +123,13 @@ class LockedTmuxConfigTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "found none"):
             MODULE.check_tmux_boot("set -g status 2\n", "linux-full")
 
-    def test_isolated_server_gets_no_boot_or_restore_hook(self):
+    def test_isolated_server_never_loads_continuum(self):
+        # tpm reads ~/.tmux.conf from disk, so the isolated file must not run tpm at all: continuum's boot
+        # handler would disable the real tmux boot unit (#1 of the 2026-10-27 audit).
         isolated = MODULE.isolated_tmux_config(self.config)
-        self.assertIn("set -g @continuum-boot 'off'", isolated)
-        self.assertIn("set -g @continuum-restore 'off'", isolated)
-        self.assertNotIn("'on'\nset -g @continuum-restore", isolated)
+        self.assertNotIn(MODULE.TPM_RUN, isolated)
+        self.assertNotIn("plugins/tmux-continuum/*.tmux", isolated)
+        self.assertIn("""run 'for f in ~/.tmux/plugins/tmux-toggle-popup/*.tmux; do "$f"; done'""", isolated)
 
     @unittest.skipUnless(shutil.which("tmux"), "tmux is needed for the integration check")
     def test_locked_config_has_the_options_the_verifier_expects(self):

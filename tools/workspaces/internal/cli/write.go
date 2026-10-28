@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"workspaces/internal/config"
+	"workspaces/internal/harness"
 	"workspaces/internal/jsonedit"
 	"workspaces/internal/picker"
 	"workspaces/internal/policy"
@@ -89,7 +90,7 @@ func (a *App) editHarnesses(change func(cur *config.Harnesses, top *jsonedit.Obj
 	if code != exitOK {
 		return code
 	}
-	cur, err := config.ParseHarnesses(raw, a.home(), knownAdapter)
+	cur, err := config.ParseHarnesses(raw, a.home(), harness.Known)
 	if err != nil {
 		return a.fail(exitConfig, "%s: %v; fix it by hand before changing it with workspaces", path, err)
 	}
@@ -102,7 +103,7 @@ func (a *App) editHarnesses(change func(cur *config.Harnesses, top *jsonedit.Obj
 		return code
 	}
 	return a.commit(path, top, msg, func(b []byte) error {
-		_, err := config.ParseHarnesses(b, a.home(), knownAdapter)
+		_, err := config.ParseHarnesses(b, a.home(), harness.Known)
 		return err
 	})
 }

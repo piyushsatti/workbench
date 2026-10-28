@@ -12,7 +12,7 @@ import type { Counts, Diet, Line, MemoryFile, Status } from '../types'
 // The memory files the context loaded are listed under the first notice below the logo, and by /mem.
 // /diet opens a side pane with what the context is spent on, largest first.
 
-const status = atom({ plugin: 'cc-status', key: 'status' } as const, { memory: null } as Status)
+const status = atom({ plugin: 'cc-status', key: 'status' } as const, { memory: null } satisfies Status)
 const diet = atom({ plugin: 'cc-status', key: 'diet' } as const, null as Diet)
 const line = atom({ plugin: 'cc-status', key: 'line' } as const, null as Line)
 const counts = atom({ plugin: 'cc-status', key: 'counts' } as const, null as Counts)

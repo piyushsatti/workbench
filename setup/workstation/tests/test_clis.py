@@ -44,9 +44,22 @@ class CliTests(unittest.TestCase):
         return ""
 
     def installed(self, name):
+        real = self.home / "elsewhere" / name
+        real.parent.mkdir(exist_ok=True)
+        real.write_text("#!/bin/sh\n")
         path = self.home / ".local/bin" / name
-        path.symlink_to("/opt/elsewhere/" + name)
+        path.symlink_to(real)
         return path
+
+    def test_a_dangling_link_or_our_broken_wrapper_is_reinstalled(self):
+        (self.home / ".local/bin/claude").symlink_to("/opt/gone/claude")
+        target = MODULE.DATA / "npm/node_modules/.bin/codex"
+        (self.home / ".local/bin/codex").write_text(MODULE.npm_wrapper(target))  # its npm install was cleared
+        self.installed("opencode")
+        with mock.patch.object(MODULE, "write"):
+            MODULE.harness_clis()
+        [npm] = self.calls
+        self.assertEqual(npm[-2:], ["@anthropic-ai/claude-code@latest", "@openai/codex@latest"])
 
     def test_installed_clis_are_kept_and_reported(self):
         for name in ("claude", "codex", "opencode", "uv", "chezmoi"):
@@ -137,6 +150,24 @@ class ClaudePluginTests(unittest.TestCase):
             MODULE.claude_plugins()
         self.assertEqual(self.calls, [])
 
+
+
+class DockerGroupTests(unittest.TestCase):
+    def pending(self, members, gid, my_groups):
+        group = mock.Mock(gr_mem=members, gr_gid=gid)
+        with mock.patch.object(MODULE.grp, "getgrnam", return_value=group), \
+                mock.patch.object(MODULE.os, "getgroups", return_value=my_groups), \
+                mock.patch.dict(MODULE.os.environ, {"USER": "me"}):
+            return MODULE.docker_group_pending()
+
+    def test_joined_but_not_yet_logged_in_again(self):
+        self.assertTrue(self.pending(["me"], 999, [20, 1000]))
+
+    def test_session_already_has_the_group(self):
+        self.assertFalse(self.pending(["me"], 999, [20, 999]))
+
+    def test_not_a_member(self):
+        self.assertFalse(self.pending(["someone"], 999, [20]))
 
 if __name__ == "__main__":
     unittest.main()

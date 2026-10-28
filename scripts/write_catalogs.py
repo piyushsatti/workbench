@@ -2,7 +2,7 @@
 """Rewrite the two `pi` marketplace catalogs at this repo's root (Claude Code and Codex).
 
 The plugins live in their own repos next to this one (plugins.json). Catalog entries point at each repo
-on GitHub, pinned by `sha` once pushed; an entry with `path` lives in this repo and is cataloged by that relative path. Cursor resolves catalog entries only inside the catalog's own repo,
+on GitHub, pinned by `sha`; one whose `sha` is still null is not pushed yet and is left out. An entry with `path` lives in this repo and is cataloged by that relative path. Cursor resolves catalog entries only inside the catalog's own repo,
 so it has no `pi` catalog: Cursor users add each plugin repo directly (each ships a .cursor-plugin manifest).
 A catalog lists a plugin only for the harnesses whose manifest the plugin ships (CONVENTIONS.md).
 
@@ -34,8 +34,11 @@ def pinned(entry, source):
 
 def catalogs(root=ROOT, source=None):
     entries = {"claude": [], "codex": []}
-    missing = []
+    missing, unpushed = [], []
     for entry, repo in plugin_repos.repos(root, source):
+        if "github" in entry and not entry.get("sha"):
+            unpushed.append(entry["name"])
+            continue
         if not repo.is_dir():
             missing.append(entry["name"])
             continue
@@ -57,7 +60,7 @@ def catalogs(root=ROOT, source=None):
         ".claude-plugin/marketplace.json": {"name": "pi", "owner": OWNER, "metadata": {"description": f"Plugins for Claude Code. {NOTE}"}, "plugins": entries["claude"]},
         ".agents/plugins/marketplace.json": {"schemaVersion": 1, "name": "pi", "interface": {"displayName": "pi"}, "plugins": entries["codex"]},
     }
-    return files, missing
+    return files, missing, unpushed
 
 
 def main(argv=None):
@@ -67,7 +70,9 @@ def main(argv=None):
     parser.add_argument("--apply", action="store_true", help="write the catalogs")
     args = parser.parse_args(argv)
     changed = 0
-    files, missing = catalogs(args.root, args.source)
+    files, missing, unpushed = catalogs(args.root, args.source)
+    for name in unpushed:
+        print(f"UNPUSHED     {name}: plugins.json has no sha yet; left out until it is pushed and pinned")
     for name in missing:
         print(f"MISSING      {name}: no repo at {plugin_repos.source_dir() if not args.source else args.source}/{name}; left out")
     for rel, value in files.items():

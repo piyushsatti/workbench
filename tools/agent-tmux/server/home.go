@@ -17,9 +17,9 @@ const requiredParentComm = "claude"
 
 // Home is the pane this server serves. Err non-nil means every tool refuses with that reason.
 type Home struct {
-	PaneID, WindowID, SessionID string
-	ParentComm                  string
-	Err                         error
+	PaneID, SessionID string
+	ParentComm        string
+	Err               error
 }
 
 // statTail splits /proc/<pid>/stat into comm and the fields after it, which start at field 3 (state).
@@ -116,7 +116,7 @@ func DetectHome(t tmux, procRoot string, self int) Home {
 		if checkID(rePaneID, m["pane_id"]) != nil || checkID(reWindowID, m["window_id"]) != nil || checkID(reSessionID, m["session_id"]) != nil {
 			return fail("malformed ids from tmux")
 		}
-		return Home{PaneID: m["pane_id"], WindowID: m["window_id"], SessionID: m["session_id"], ParentComm: parentComm}
+		return Home{PaneID: m["pane_id"], SessionID: m["session_id"], ParentComm: parentComm}
 	}
 	return fail("no ancestor process is a tmux pane")
 }

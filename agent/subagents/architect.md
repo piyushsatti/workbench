@@ -7,12 +7,13 @@ model: sonnet
 
 ## Canonical standards
 
-Read `agent/rulebooks/engineering/architecture/design.md` for this role, or the standards path the caller supplies. Read another standard below only when the task touches that concern:
+Use the standards path the caller supplies. Without one, the paths below are the workbench repo's rulebooks: they exist only when you run inside workbench (`~/Source/workbench`). Anywhere else, ask the caller for the standard instead of reviewing without one.
+
+Read `agent/rulebooks/engineering/architecture/design.md` for this role. Read another standard below only when the task touches that concern:
 
 - `agent/rulebooks/governance/authority-and-changes.md`
 - `agent/rulebooks/governance/ambiguity.md`
 - `agent/rulebooks/documentation/communication.md`
-- `agent/rulebooks/engineering/architecture/design.md`
 - `agent/rulebooks/orchestration/procedures.md`
 - `agent/rulebooks/engineering/coding.md`
 - `agent/rulebooks/engineering/shell-safety.md`

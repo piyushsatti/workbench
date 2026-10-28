@@ -1,0 +1,34 @@
+{{ if eq .chezmoi.os "darwin" -}}
+#!/bin/sh
+# Put each tmux plugin at the commit pinned in .chezmoidata/tmux_plugins.json, the list Workstation
+# installs on Ubuntu. chezmoi reruns this when a pin changes. prefix + I and prefix + U fetch upstream
+# HEAD instead, so don't use them. A checkout drops local edits; run_after_20 puts the resurrect patch back.
+set -eu
+plugins="$HOME/.tmux/plugins"
+mkdir -p "$plugins"
+
+pin() {  # name, GitHub owner/repo, commit
+  dir="$plugins/$1"
+  if [ -e "$dir" ] && [ ! -d "$dir/.git" ]; then
+    echo "tmux plugin $1: $dir is not a git checkout; left alone" >&2
+    return 0
+  fi
+  [ -d "$dir/.git" ] || { git init -q "$dir" && git -C "$dir" remote add origin "https://github.com/$2.git"; }
+  if [ "$(git -C "$dir" rev-parse -q --verify HEAD 2>/dev/null || true)" != "$3" ]; then
+    git -C "$dir" fetch -q --depth 1 "https://github.com/$2.git" "$3"
+    git -C "$dir" -c advice.detachedHead=false checkout -q -f "$3"
+    echo "tmux plugin $1: $3"
+  fi
+}
+
+{{ range .tmuxPlugins -}}
+pin {{ .name | quote }} {{ .repo | quote }} {{ .commit | quote }}
+{{ end -}}
+
+# tmux-thumbs needs its Rust binary. Build it from the pinned source; never take its prebuilt download.
+if command -v cargo >/dev/null 2>&1; then
+  (cd "$plugins/tmux-thumbs" && cargo build -q --release --locked)
+else
+  echo "tmux-thumbs: cargo not found, so its binary is not built" >&2
+fi
+{{ end -}}

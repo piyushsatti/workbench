@@ -16,9 +16,9 @@ Retain useful, recurring facts with their scope and provenance. An ordinary memo
 
 Each harness keeps memory in its own native store (for Claude Code, the per-project memory under `~/.claude/projects/`). The Dream skill (`agent/skills/dream`) consolidates it on request. Authored knowledge bases, standards and project documentation remain external.
 
-Memory schema `3` retains `created`, `type`, `scope`, `genericity`, `last_updated`, and `schema_version`, and adds a stable `id`, `provenance`, and lifecycle `status` (`active`, `deprecated`, or `tombstone`). Scope contains `key`, `depth`, and `role`: `key` identifies the logical owner independently of its machine path. The home key is `{key: home, depth: 0, role: home}`. Never infer project identity from depth alone.
+A memory record carries `created`, `last_updated`, `type`, `scope`, `genericity`, a stable `id`, `provenance`, and lifecycle `status` (`active`, `deprecated`, or `tombstone`). Scope contains `key`, `depth`, and `role`: `key` identifies the logical owner independently of its machine path. The home key is `{key: home, depth: 0, role: home}`. Never infer project identity from depth alone.
 
-Read schema `2` without changing it. Migration must preserve originals, explicitly resolve owner identity, and produce a reviewable manifest. Unknown schemas or unresolved ownership require review, not guessed conversion. Name each file `<created>-<type>_<slug>.md` and update `last_updated` whenever memory changes.
+The format has no version number. A record missing a field gets it the next time it is rewritten; when its owner cannot be resolved, it goes to review instead of a guessed key. Name each file `<created>-<type>_<slug>.md` and update `last_updated` whenever memory changes.
 
 Writes require explicit scope. Replacing a record requires its expected content hash, checked under the write lock; conflicting updates must not overwrite each other. Preserve stable identity and provenance through merges and retirement. Retain preimages and tombstones so retries cannot resurrect retired knowledge.
 

@@ -27,7 +27,7 @@ import shlex
 import sys
 
 SEPARATORS = {"&&", "||", ";", "|", "&", "|&", ";;", "(", ")", "`", "\n", "{", "}", "!"}
-KEYWORDS = {"if", "then", "else", "elif", "do", "while", "until", "!", "{", "}", "fi", "done"}
+KEYWORDS = {"if", "then", "else", "elif", "do", "while", "until", "fi", "done", "coproc"}  # ! { } are SEPARATORS
 SHELLS = {"sh", "bash", "zsh", "dash", "ksh", "mksh", "fish"}
 # Wrappers that run their remaining arguments as a command. Value: options that take a separate value.
 WRAPPERS = {
@@ -42,11 +42,12 @@ WRAPPERS = {
 # Wrappers whose first positional argument is not the command (timeout DURATION, flock FILE).
 WRAPPER_POSITIONALS = {"timeout": 1, "flock": 1}
 
-GIT_GLOBAL_WITH_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path",
-                         "--config-env", "--super-prefix", "--list-cmds", "--attr-source"}
-COMMIT_WITH_VALUE = {"-m", "-F", "-c", "-C", "-t", "--message", "--file", "--reuse-message",
+# --exec-path, --list-cmds and --super-prefix take a value only with `=`, so they are not here.
+GIT_GLOBAL_WITH_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env", "--attr-source"}
+# Long options only; short ones are COMMIT_SHORT_VALUE below.
+COMMIT_WITH_VALUE = {"--message", "--file", "--reuse-message",
                      "--reedit-message", "--template", "--author", "--date", "--cleanup",
-                     "--fixup", "--squash", "--trailer", "--pathspec-from-file", "--untracked-files"}
+                     "--fixup", "--squash", "--trailer", "--pathspec-from-file"}
 # Short commit options that take a value (the rest of a bundle is that value): -m, -F, -c, -C, -t, -S, -u.
 COMMIT_SHORT_VALUE = set("mFcCtSu")
 
@@ -82,12 +83,44 @@ def basename(word):
     return word.lstrip("\\").rsplit("/", 1)[-1]
 
 
+def bash_text(text):
+    """The text as bash reads it before splitting words: backslash-newline joins lines (outside single quotes),
+    and # starts a comment only at the start of a word. shlex would cut at any #, so `-m fix#1 --no-verify`
+    hid the flag, and it keeps the newline of a continuation, so `\\<newline>-n` was not an option."""
+    out, i, quote = [], 0, None
+    while i < len(text):
+        char = text[i]
+        if quote == "'":
+            quote = None if char == "'" else quote
+            out.append(char)
+            i += 1
+        elif char == "\\" and i + 1 < len(text):
+            if text[i + 1] != "\n":
+                out.append(text[i:i + 2])
+            i += 2
+        elif quote == '"':
+            quote = None if char == '"' else quote
+            out.append(char)
+            i += 1
+        elif char in "'\"":
+            quote = char
+            out.append(char)
+            i += 1
+        elif char == "#" and (not out or out[-1] in " \t\r\n;&|()<>`"):
+            end = text.find("\n", i)
+            i = len(text) if end == -1 else end
+        else:
+            out.append(char)
+            i += 1
+    return "".join(out)
+
+
 def tokenize(text):
     """Split shell text into words and separator tokens (quotes removed, newlines kept)."""
-    lexer = shlex.shlex(text, posix=True, punctuation_chars="();<>|&`\n")
+    lexer = shlex.shlex(bash_text(text), posix=True, punctuation_chars="();<>|&`\n")
     lexer.whitespace = " \t\r"
     lexer.whitespace_split = True
-    lexer.commenters = "#"
+    lexer.commenters = ""
     try:
         tokens = list(lexer)
     except ValueError as error:
@@ -193,8 +226,14 @@ class Guard:
         name, args = self.unwrap(words)
         if name is None:
             return
-        if name in {"export", "declare", "typeset", "local", "readonly", "set"} and args is not None:
+        if name in {"export", "declare", "typeset", "local", "readonly", "set", "unset"} and args is not None:
+            # unset, export -n and declare/typeset +x take HOME out of git's environment, like env -u.
+            unexports = name == "unset" or any(
+                a.startswith("-" if name == "export" else "+") and ("n" if name == "export" else "x") in a
+                for a in args if name in {"export", "declare", "typeset"})
             for arg in args:
+                if unexports and arg in CONFIG_HIDING_ENV:
+                    self.config_hidden = f"{arg} unset"
                 self.assignment(arg)
             return
         if name == "env":
@@ -244,10 +283,20 @@ class Guard:
                 i += 1
                 while i < len(words):
                     arg = words[i]
-                    if arg in {"-i", "--ignore-environment", "-"} or (arg.startswith("-") and not arg.startswith("--")
-                                                                      and "i" in arg[1:] and "u" not in arg[1:]):
+                    flags = re.match(r"-([0iv]+)(.*)", arg, re.S)
+                    if arg in {"-i", "--ignore-environment", "-"}:
                         self.config_hidden = "the environment cleared (env -i)"
                         i += 1
+                    elif flags:
+                        # A bundle: the flags -0, -i and -v first, then maybe one option that takes a value
+                        # (-iS'git …', -iC dir), which is parsed as its own word. `-S'git …'` holds an i too,
+                        # but after the S, so it is a script, handled below.
+                        if "i" in flags[1]:
+                            self.config_hidden = "the environment cleared (env -i)"
+                        if flags[2]:
+                            words = words[:i] + ["-" + flags[2]] + words[i + 1:]
+                        else:
+                            i += 1
                     elif arg in {"-u", "--unset"} and i + 1 < len(words):
                         if words[i + 1] in CONFIG_HIDING_ENV:
                             self.config_hidden = f"{words[i + 1]} unset"
@@ -262,7 +311,7 @@ class Guard:
                     elif arg.startswith("--split-string=") or (arg.startswith("-S") and len(arg) > 2):
                         rest = arg.split("=", 1)[1] if arg.startswith("--") else arg[2:]
                         return self.unwrap(tokenize(rest) + words[i + 1:])
-                    elif arg in {"-C", "--chdir"}:
+                    elif arg in {"-C", "--chdir", "-P"}:  # -P altpath (BSD env) takes a value too
                         i += 2
                     elif arg == "--":
                         i += 1
@@ -334,6 +383,9 @@ class Guard:
             self.commit(rest)
         elif sub == "config":
             self.config(rest)
+        elif sub in {"merge", "pull"} and "--no-verify" in rest:
+            # Exact word only: every shorter prefix is ambiguous with --no-verify-signatures, and -n means --no-stat.
+            raise Denied(f"`git {sub} --no-verify` skips the pre-merge-commit identity check.")
 
     def config_key(self, key, shown):
         if PROTECTED_KEY.match(key.strip().lower()):
@@ -376,7 +428,10 @@ class Guard:
             elif opt in CONFIG_WITH_VALUE:
                 if "=" not in arg:
                     i += 1
-            elif arg.startswith("-") and len(arg) > 1 and arg != "--":
+            elif arg == "--":
+                positionals.extend(args[i + 1:])  # git config reads every word after -- as a name or value
+                break
+            elif arg.startswith("-") and len(arg) > 1:
                 pass
             else:
                 positionals.append(arg)
@@ -397,9 +452,11 @@ class Guard:
             return
         key = positionals[0].lower()
         if write_flag in {"--rename-section", "--remove-section", "rename-section", "remove-section"}:
-            if PROTECTED_SECTION.match(key):
-                raise Denied(f"`git config {write_flag} {positionals[0]}` touches identity, hook, alias, include "
-                             "or credential config.")
+            # Both names count: renaming `evil` (holding hookspath) to `core` writes core.hookspath.
+            for section in positionals[:2]:
+                if PROTECTED_SECTION.match(section.lower()):
+                    raise Denied(f"`git config {write_flag} {' '.join(positionals[:2])}` touches identity, hook, "
+                                 "alias, include or credential config.")
             return
         if PROTECTED_KEY.match(key) or key == "core.hookspath":
             raise Denied(f"`git config` would write {positionals[0]}. Identity and core.hooksPath come from this "
@@ -429,9 +486,16 @@ def substitutions(word):
 
 def shell_script(args):
     """The -c script of `sh -c SCRIPT` (also -lc, -ec, -c after other options), or None."""
+    skip = False
     for i, arg in enumerate(args):
+        if skip:
+            skip = False
+            continue
         if arg == "--":
             return None
+        if arg in {"-o", "-O", "+o", "+O"}:  # set -o / shopt -O take an option name: `bash -o pipefail -c …`
+            skip = True
+            continue
         if arg.startswith("-") and not arg.startswith("--") and "c" in arg[1:]:
             rest = [a for a in args[i + 1:] if not (a.startswith("-") and len(a) > 1)]
             return rest[0] if rest else ""

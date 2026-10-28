@@ -19,33 +19,6 @@
       }
     },
     {
-      "name": "rpctool",
-      "description": "Shrinks large tool results to head and tail with the full text saved to a file, and runs commands on allowlisted hosts over ssh through an MCP server",
-      "version": "2026.10.22",
-      "source": {
-        "source": "github",
-        "repo": "piyushsatti/rpctool"
-      }
-    },
-    {
-      "name": "agent-coop",
-      "description": "A shared document-review surface with a SQLite event log, browser UI, and Claude wake-up bridge.",
-      "version": "2026.10.22",
-      "source": {
-        "source": "github",
-        "repo": "piyushsatti/agent-coop"
-      }
-    },
-    {
-      "name": "ordinator",
-      "description": "Execution orchestration for a fleet of implementation sessions: one orchestrator skill that launches, relays and records; one implementation skill per ticket that plans, builds, reviews and opens a draft PR through the ticket-pr workflow; eleven stage agents with narrow tool surfaces. Configured per project by the setup skill.",
-      "version": "2026.10.22",
-      "source": {
-        "source": "github",
-        "repo": "piyushsatti/ordinator"
-      }
-    },
-    {
       "name": "agent-tmux",
       "description": "Stdio MCP server that lets an agent see and lay out its own tmux session: list, capture, new windows and splits, wait for output, and type into panes it owns without pressing Enter",
       "version": "2026.10.22",

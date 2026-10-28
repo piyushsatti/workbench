@@ -1,11 +1,6 @@
 export type MemoryFile = { path: string; type: string; tokens: number }
 
-export type Status = {
-  cwd: string
-  branch: string | null
-  worktree: boolean
-  memory: MemoryFile[] | null
-}
+export type Status = { memory: MemoryFile[] | null }
 
 export type Diet = { rows: { name: string; tokens: number }[]; total: number } | null
 

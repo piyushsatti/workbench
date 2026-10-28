@@ -94,7 +94,7 @@ Open loops skip scoring. Each one goes to the end-of-run table for the user to k
 Build the cross-project view once per run:
 
 ```bash
-dream-catalog ~/.claude/projects <state>/recall.tsv > <run>/catalog.tsv
+dream-catalog ~/.claude/projects <state>/recall.next.tsv > <run>/catalog.tsv
 ```
 
 Write the survivors, with their scores and tiers, to `<run>/plan.md`.
@@ -155,7 +155,7 @@ Group the rules by the principle behind them. When several items share one princ
 Write the plan into the store. Rulebook drafts, retirements, demotions and tracker tasks wait for the user's approval.
 
 - **Filename:** `<created>-<type>_<slug>.md`, where `<created>` is the date the fact was first recorded.
-- **Frontmatter:** `name` (the slug), `description` (one line, used for recall), `created`, `last_updated`, `last_confirmed` (when set), `type` (user, feedback, project or reference), `scope` (`{depth: N, role: project}`), `genericity` (`specific` when unsure), `schema_version: 2`, and `metadata: {type: ...}`.
+- **Frontmatter:** `name` (the slug), `id` (the first file's name without `.md`, kept through renames and merges), `description` (one line, used for recall), `created`, `last_updated`, `last_confirmed` (when set), `type` (user, feedback, project or reference), `scope` (`{key: <owner>, depth: N, role: project}`, where the key names the project, not its path; home is `{key: home, depth: 0, role: home}`), `genericity` (`specific` when unsure), `provenance` (the session or source the fact came from), `status` (`active`, `deprecated` or `tombstone`), and `metadata: {type: ...}`. There is no version field. A file missing one of these gets it the next time it is rewritten; when its owner is unclear, ask instead of guessing the key.
 - **Tiers:** index files sit in `memory/` and each has one `MEMORY.md` line, `- [Title](file.md) — hook`. Archive files sit in `memory/archive/`, with the same frontmatter and no index line. No content goes in `MEMORY.md`.
 - Write files with Write and Edit. Bash usually cannot write in `~/.claude/projects`.
 - A harness hook may move the rulebook fields under `metadata:` and add `originSessionId` after a write. That is fine, and the lint accepts both places.

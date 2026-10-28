@@ -47,12 +47,27 @@ class WriteCatalogsTests(unittest.TestCase):
             root = Path(temp)
             FIXTURE.good_plugin(root)
             pi, args = root / "pi", ["--root", str(root / "pi"), "--source", str(root)]
-            FIXTURE.write(pi / "plugins.json", {"plugins": [{"name": "demo", "github": "me/demo", "sha": None},
-                                                            {"name": "absent", "github": "me/absent", "sha": None}]})
+            FIXTURE.write(pi / "plugins.json", {"plugins": [{"name": "demo", "github": "me/demo", "sha": "abc123"},
+                                                            {"name": "absent", "github": "me/absent", "sha": "abc123"}]})
             with redirect_stdout(StringIO()) as out:
                 WRITE.main([*args, "--apply"])
             self.assertIn("MISSING      absent", out.getvalue())
 
+
+    def test_an_unpushed_plugin_is_left_out_and_the_lint_warns(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            FIXTURE.good_plugin(root)
+            pi, args = root / "pi", ["--root", str(root / "pi"), "--source", str(root)]
+            FIXTURE.write(pi / "plugins.json", {"plugins": [{"name": "demo", "github": "me/demo", "sha": None}]})
+            with redirect_stdout(StringIO()) as out:
+                WRITE.main([*args, "--apply"])
+            self.assertIn("UNPUSHED     demo", out.getvalue())
+            self.assertEqual(json.loads((pi / ".claude-plugin/marketplace.json").read_text())["plugins"], [])
+            self.assertEqual(json.loads((pi / ".agents/plugins/marketplace.json").read_text())["plugins"], [])
+            with redirect_stdout(StringIO()) as out:
+                self.assertEqual(LINT.main(args), 0)
+            self.assertIn("demo: not in the catalogs until it is pushed", out.getvalue())
 
     def test_a_plugin_hosted_in_this_repo_is_cataloged_by_path(self):
         with tempfile.TemporaryDirectory() as temp:

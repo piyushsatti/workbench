@@ -108,7 +108,9 @@ def hook(stdin):
         prompt = json.loads(stdin or "{}").get("prompt", "")
     except (ValueError, AttributeError):
         return None
-    if not isinstance(prompt, str) or prompt.lstrip().startswith("/"):
+    # A slash command is one /word (with : . - allowed) then a space or the end; a pasted path such as
+    # /Users/me/app/log.txt has a second / and is an ordinary prompt.
+    if not isinstance(prompt, str) or re.match(r"/[\w:.-]+(\s|$)", prompt.lstrip()):
         return None
     extra = context_for(catalog(), enabled())
     if not extra:

@@ -40,8 +40,8 @@ class PluginLockTests(unittest.TestCase):
     def test_every_configured_plugin_is_pinned_and_every_pin_is_configured(self):
         configured = re.findall(r"^set -g @plugin '([^']+)'$", TMUX_CONF.read_text(), re.MULTILINE)
         self.assertEqual(len(configured), len(set(configured)))
-        self.assertEqual(sorted(configured), sorted(plugin["repo"] for plugin in MODULE.PLUGINS))
-        for plugin in MODULE.PLUGINS:
+        self.assertEqual(sorted(configured), sorted(plugin["repo"] for plugin in MODULE.pinned_plugins()))
+        for plugin in MODULE.pinned_plugins():
             # TPM loads ~/.tmux/plugins/<repository name>, so that is where the installer must put it.
             self.assertEqual(plugin["name"], plugin["repo"].split("/")[1])
             self.assertRegex(plugin["commit"], r"^[0-9a-f]{40}$")

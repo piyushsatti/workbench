@@ -13,6 +13,10 @@ GUARD = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(GUARD)
 
 ALLOW = [
+    "git merge -n feature",
+    "git merge --no-verify-signatures feature",
+    "unset GIT_PAGER; git commit -m x",
+    "export -n FOO; git commit -m x",
     "git status",
     "git log --oneline -5",
     'git commit -m "feat: thing"',
@@ -47,6 +51,10 @@ ALLOW = [
     "npm test && git add -p",
     "python3 -c 'print(1)'",
     "",
+    "git status # a comment that isn't checked",
+    "git commit -m x  # done",
+    "echo ${#PATH} && git status",
+    "env -v git status",
 ]
 
 DENY = [
@@ -144,6 +152,32 @@ DENY = [
     "bash <<< 'git commit -n'",
     "cd x && bash <<EOF\ngit commit -n\nEOF",
     "git commit -m \"$(cat <<'EOF'\nx\nEOF\n)\" --no-verify",
+    # From the 2026-10-27 audit: each of these was allowed before.
+    "git commit -m fix#1 --no-verify",         # a # inside a word is not a comment
+    "echo a#b && git commit --no-verify -m x",
+    "git commit \\\n-n -m x",                 # backslash-newline joins the lines
+    "git commit -a --untracked-files -n -m x", # --untracked-files takes no separate value
+    "git config --rename-section evil core",   # the new name counts too
+    "env -S'git commit -n -m x'",              # -S with an attached script, not -i
+    "env -P /usr/bin git commit -n -m x",      # -P takes a value
+    "env -iS 'git commit --no-verify -m x'",   # a flag bundle ending in -S
+    "env -vS'git commit -n -m x'",
+    "env -iC /tmp git commit --no-verify -m x",  # a flag bundle ending in -C
+    "env -iu HOME git commit -m x",            # still env -i
+    "bash -o pipefail -c 'git commit -n -m x'",
+    "bash -O extglob -c 'git commit -n -m x'",
+    "git config -- user.email evil@example.com",
+    "git config -- core.hooksPath /dev/null",
+    "git config --global -- user.name x",
+    "unset HOME; git commit -m x",
+    "unset -v XDG_CONFIG_HOME HOME && git commit -m x",
+    "export -n HOME; git commit -m x",
+    "declare +x HOME; git commit -m x",
+    "typeset -g +x HOME; git commit -m x",
+    "git merge --no-verify feature",
+    "git -C repo pull --no-verify origin main",
+    "coproc git commit -n -m x",
+    "coproc worker { git commit --no-verify -m x; }",
 ]
 
 

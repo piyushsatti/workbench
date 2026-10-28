@@ -10,6 +10,7 @@ Exit status 1 when any plugin or catalog has an error; warnings alone exit 0.
 import argparse
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -256,6 +257,19 @@ def lint_catalogs(root, plugins, listed_repos):
     return problems
 
 
+def pin_problems(name, entry, repo):
+    """The catalog takes version and description from the clone, but installs fetch the pinned sha:
+    a clone at another commit makes the catalog describe code the pin does not install."""
+    sha = entry.get("sha")
+    if "github" not in entry or not sha:
+        return []
+    head = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    if head == sha:
+        return []
+    return [("error", f"{name}: the clone at {repo} is at {head[:12] or 'no commit'}, but plugins.json pins {sha[:12]}; "
+                      "check out the pin, or move the pin after pushing")]
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--root", type=Path, default=ROOT, help="the workbench repo (default: this one)")
@@ -264,7 +278,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     listed = {entry["name"]: entry for entry in plugin_repos.entries(args.root)}
-    owner = json.loads((args.root / "plugins.json").read_text()).get("owner")
+    owner = plugin_repos.owner(args.root)
     repos = {entry["name"]: repo for entry, repo in plugin_repos.repos(args.root, args.source)}
     report, infos = [], {}
     for name in sorted(repos):
@@ -273,11 +287,13 @@ def main(argv=None):
         if not repos[name].is_dir():
             report.append(("warning", f"{name}: listed in plugins.json but no repo at {repos[name]}"))
             continue
-        github_owner = listed[name].get("github", "").split("/")[0]
-        third_party = bool(owner and github_owner and github_owner != owner)
+        third_party = plugin_repos.third_party(listed[name], owner)
+        report += pin_problems(name, listed[name], repos[name])
         problems, info = (lint_third_party if third_party else lint_plugin)(repos[name])
         report += problems
-        if info:
+        if "github" in listed[name] and not listed[name].get("sha"):
+            report.append(("warning", f"{name}: not in the catalogs until it is pushed and plugins.json pins its sha"))
+        elif info:
             infos[name] = info
     if not args.plugin:
         report += lint_catalogs(args.root, infos, listed)

@@ -17,8 +17,14 @@ HISTFILESIZE=20000
 HISTCONTROL=ignoreboth     # no duplicates, no space-prefixed cmds
 
 # Default editor for crontab, kubectl edit, gh, etc.
+{{- /* VS Code where there is a desktop (macOS, linux-full), Neovim on headless Linux, as in dot_gitconfig.tmpl. */}}
+{{- if or (eq .chezmoi.os "darwin") (eq $profile "linux-full") }}
 export EDITOR="code --wait"
 export VISUAL="code --wait"
+{{- else }}
+export EDITOR="nvim"
+export VISUAL="nvim"
+{{- end }}
 # bat follows the shared theme (.chezmoidata/theme.yaml)
 export BAT_THEME="{{ (index .themes $themeName).names.bat }}"
 

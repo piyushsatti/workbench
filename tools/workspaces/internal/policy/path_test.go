@@ -31,3 +31,18 @@ func TestMatches(t *testing.T) {
 		}
 	}
 }
+
+func TestMatchesFoldsCaseOnlyWhereTheDiskDoes(t *testing.T) {
+	defer func(old bool) { foldCase = old }(foldCase)
+	plain := config.Entry{Path: "/h/Source/secret"}
+	glob := config.Entry{Path: "/h/Source/private/*", Glob: true}
+	for _, fold := range []bool{true, false} {
+		foldCase = fold
+		if got := Matches("/h/Source/SECRET/x", plain); got != fold {
+			t.Errorf("foldCase=%v: Matches(SECRET under secret) = %v", fold, got)
+		}
+		if got := Matches("/h/Source/PRIVATE/proj", glob); got != fold {
+			t.Errorf("foldCase=%v: Matches(PRIVATE under private/*) = %v", fold, got)
+		}
+	}
+}

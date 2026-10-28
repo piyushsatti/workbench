@@ -17,9 +17,19 @@ var (
 	// is covered too. A password holding a raw '/' is not valid in a URL (it must be percent-encoded) and is not caught.
 	reURLUserinfo = regexp.MustCompile(`([A-Za-z][A-Za-z0-9+.-]*://[^\s:/@'"]*):[^\s'"/]*@`)
 
-	// --password VALUE, --password=VALUE and a few like it, in any case. A value may not start with '-', so
-	// "--pass -x" keeps the flag that follows.
-	reSecretLongFlag = regexp.MustCompile(`(?i)(^|\s)(--(?:password|passwd|pass|token|secret|api-key|apikey)(?:=|\s+))("[^"]*"|'[^']*'|[^\s-]\S*)`)
+	// http(s)://TOKEN@host: a token as the whole userinfo, as GitHub tokens are often used. Only http(s), because
+	// ssh://git@host names a user, not a secret.
+	reURLToken = regexp.MustCompile(`(https?://)[^\s:/@'"]+@`)
+
+	// --password VALUE, --password=VALUE and the same with a dashed prefix (--access-token, --auth-token,
+	// --client-secret), in any case. A value may not start with '-', so "--pass -x" keeps the flag that follows.
+	reSecretLongFlag = regexp.MustCompile(`(?i)(^|\s)(--(?:[A-Za-z0-9]+-)*(?:password|passwd|pass|token|secret|api-key|apikey)(?:=|\s+))("[^"]*"|'[^']*'|[^\s-]\S*)`)
+
+	// curl -u user:pass, --user user:pass and --user=user:pass: the part after the first ':'.
+	reUserPass = regexp.MustCompile(`(^|\s)(-u\s*|--user(?:=|\s+))(["']?)([^\s:'"]+):[^\s'"]+`)
+
+	// Authorization: <scheme> <credentials> in a header, whatever the scheme (token, Basic, Bearer).
+	reAuthHeader = regexp.MustCompile(`(?i)(authorization:\s*[A-Za-z]+\s+)[^\s'"]+`)
 
 	// -p VALUE, -p=VALUE and -pVALUE (mysql style), lower case only: -P is a port in ssh, scp and mysql. This also
 	// hits "mkdir -p dir" and "docker run -p 8080:80", which is accepted over-redaction.
@@ -34,7 +44,10 @@ var (
 // redact masks the secrets it recognises in text a tool echoes or logs.
 func redact(s string) string {
 	s = reURLUserinfo.ReplaceAllString(s, "${1}:***@")
+	s = reURLToken.ReplaceAllString(s, "${1}***@")
 	s = reSecretLongFlag.ReplaceAllString(s, "${1}${2}***")
+	s = reUserPass.ReplaceAllString(s, "${1}${2}${3}${4}:***")
+	s = reAuthHeader.ReplaceAllString(s, "${1}***")
 	s = reSecretShortFlag.ReplaceAllString(s, "${1}${2}***")
 	s = reSecretEnv.ReplaceAllString(s, "${1}=***")
 	return reBearer.ReplaceAllString(s, "${1}***")

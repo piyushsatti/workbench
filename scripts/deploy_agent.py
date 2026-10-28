@@ -8,7 +8,8 @@ Skills in agent/skills/ copy to ~/.agents/skills (and ~/.claude/skills for Claud
 runtime/ or install.json; a skill's install.json places its executables like a plugin's.
 
 Plugin executables listed in each plugin repo's install.json are copied the same way (`files`); a `build`
-entry is printed for the user to run, never run here.
+entry is printed for the user to run, never run here. A third-party plugin's install.json (one whose GitHub owner
+is not the catalog's) is never read: someone else's repo does not get to write into this home folder.
 
 `--harness claude,codex,cursor,opencode` (default: all four) picks the harness destinations. The shared
 ~/.agents files and plugin executables deploy whatever the filter says.
@@ -31,7 +32,9 @@ profiles are merged by hand per repository).
 
 import argparse
 import filecmp
+import functools
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -184,7 +187,7 @@ def plugin_installs():
     dirs = (
         sorted(PLUGINS.iterdir())
         if PLUGINS
-        else [repo for _, repo in plugin_repos.repos()]
+        else [repo for _, repo in plugin_repos.own_repos()]
         + sorted((AGENT / "skills").iterdir())
         + [AGENT / "hooks"]
         + sorted(TOOLS.iterdir())
@@ -200,7 +203,12 @@ def plugin_installs():
         data = json.loads(manifest.read_text())
         for entry in data.get("files", []):
             dest = HOME / entry["dest"].removeprefix("~/").removeprefix("$HOME/")
-            files.append((manifest.parent / entry["src"], dest, int(entry.get("mode", "0644"), 8)))
+            src = manifest.parent / entry["src"]
+            # Checked on the written path, before any symlink: an absolute dest or ../ must not leave home or the repo.
+            for path, root, field in ((dest, HOME, "dest"), (src, manifest.parent, "src")):
+                if not Path(os.path.normpath(path)).is_relative_to(os.path.normpath(root)):
+                    raise SystemExit(f"{manifest}: {field} {entry[field]!r} is outside {root}")
+            files.append((src, dest, int(str(entry.get("mode", "0644")), 8)))
         for entry in data.get("builds", []) + ([data] if "build" in data else []):
             builds.append((manifest.parent, entry["build"], entry.get("dest", "")))
     return files, builds
@@ -227,18 +235,20 @@ def mapped(src, dst, convert, suffix):
         yield path, target, convert
 
 
+@functools.cache
 def committed_rules():
-    """Every committed version of agent/AGENTS.md, as bytes; empty when this checkout has no git history."""
+    """Every committed version of agent/AGENTS.md, as bytes; empty when this checkout has no git history.
+    Read once per run: each rulebook copy asks for it, in both plan and the CHECK pass."""
     try:
         log = subprocess.run(["git", "-C", str(ROOT), "log", "--format=%H", "--", "agent/AGENTS.md"],
                              capture_output=True, text=True, check=True).stdout.split()
-        return {subprocess.run(["git", "-C", str(ROOT), "show", f"{sha}:agent/AGENTS.md"],
-                               capture_output=True, check=True).stdout for sha in log}
+        return frozenset(subprocess.run(["git", "-C", str(ROOT), "show", f"{sha}:agent/AGENTS.md"],
+                                        capture_output=True, check=True).stdout for sha in log)
     except (OSError, subprocess.CalledProcessError):
-        return set()
+        return frozenset()
 
 
-def rules_copy(which, known=None):
+def rules_copy(which):
     """Plan entry for one copy of agent/AGENTS.md (RULES_COPIES), or None with a CHECK line when the
     file has its own content.
 
@@ -253,7 +263,7 @@ def rules_copy(which, known=None):
         return (src, dst, "changed", None, None), None
     if filecmp.cmp(src, dst, shallow=False):
         return (src, dst, "same", None, None), None
-    if dst.read_bytes() in (committed_rules() if known is None else known):
+    if dst.read_bytes() in committed_rules():
         return (src, dst, "changed", None, None), None
     if which == "shared":
         return None, (f"CHECK   {dst} has its own content, left as is. Move what every machine should "
@@ -291,7 +301,7 @@ def extras(harnesses=HARNESSES):
         if src.is_dir() and dst.is_dir():
             expected = {t for _, t, _ in mapped(*target)}
             for path in sorted(p for p in dst.rglob("*") if p.is_file()):
-                if path not in expected and not path.name.endswith(".pre-deploy"):
+                if path not in expected and not path.name.endswith((".pre-deploy", ".pre-deploy.last")):
                     yield path
 
 
@@ -363,9 +373,11 @@ def main():
             if dst.is_symlink():
                 dst.unlink()
             dst.parent.mkdir(parents=True, exist_ok=True)
-            backup = dst.with_name(dst.name + ".pre-deploy")
-            if dst.exists() and not backup.exists():
-                shutil.copy2(dst, backup)
+            # Every overwrite saves what it replaces: the first into .pre-deploy, which is never overwritten, so the
+            # file from before any deploy is kept; later ones into .pre-deploy.last, so a later hand edit is kept too.
+            if dst.exists():
+                first = dst.with_name(dst.name + ".pre-deploy")
+                shutil.copy2(dst, first if not first.exists() else dst.with_name(first.name + ".last"))
             if text is None:
                 shutil.copy2(src, dst)
             else:

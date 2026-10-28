@@ -5,8 +5,6 @@ defaults.yml is kept to a small YAML subset (described at the top of that file) 
 the parser below reads; anything outside the subset is an error, never a guess.
 
 Usage:
-  profile.py list                 profile names
-  profile.py modules PROFILE      module names, one per line
   profile.py apt PROFILE          apt package names, in apt.txt order
   profile.py has PROFILE MODULE   exit 0 when the profile includes the module
   profile.py show PROFILE         the whole expansion as JSON
@@ -264,11 +262,7 @@ def check(data=None, root=ROOT):
 def main(argv):
     command, args = (argv[0], argv[1:]) if argv else ("", [])
     try:
-        if command == "list" and not args:
-            print("\n".join(load()["profiles"]))
-        elif command == "modules" and len(args) == 1:
-            print("\n".join(expand(args[0])["modules"]))
-        elif command == "apt" and len(args) == 1:
+        if command == "apt" and len(args) == 1:
             packages = expand(args[0])["apt"]
             if packages is None:
                 raise ProfileError(

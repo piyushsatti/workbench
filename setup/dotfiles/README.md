@@ -57,8 +57,7 @@ chezmoi diff       # review what would change
 chezmoi apply
 ```
 
-After first apply, start tmux and press `Ctrl+Space` then `I` to install tmux
-plugins (tpm is cloned automatically by a run-once script).
+On macOS, `chezmoi apply` installs each tmux plugin at the commit pinned in `.chezmoidata/tmux_plugins.json` (Workstation installs the same list on Ubuntu). Don't press `Ctrl+Space` then `I` or `U`: tpm would move the plugins to upstream HEAD.
 
 ## Machine-local extension points
 

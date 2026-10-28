@@ -13,7 +13,6 @@ starship
 sudo
 python3
 python3-venv
-python3-yaml
 python3-json5
 tar
 unzip

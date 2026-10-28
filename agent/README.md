@@ -23,3 +23,4 @@ Shared agent configuration for Claude Code, Codex and Cursor ([decisions](../doc
 
 - Cursor imports Claude's hook settings (user and project) by default, so registering the same hooks in Cursor fires them twice; see `docs/harness-parity.md`.
 - `hooks/git-guard.py` is built, tested and installed to `~/.local/bin/git-guard` by deploy, but not registered anywhere; hook configs are merged by hand.
+- git-guard reads commands word by word, so it does not see a commit that another program builds or runs: text piped into a shell (`echo 'git commit -n' | sh`), `xargs`, command runners (`uv run git …`, `find -exec git …`, `arch -arm64 git …`), `$(which git)`, `git rebase -x`, `git submodule foreach` and `git filter-branch`. Words produced by expansion (`$'-n'`, `{-n,-m,x}`, `$f`) are not expanded either. Register it knowing it stops the plain forms only.

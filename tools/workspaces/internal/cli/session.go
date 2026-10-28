@@ -10,6 +10,7 @@ import (
 	"text/tabwriter"
 
 	"workspaces/internal/config"
+	"workspaces/internal/harness"
 	"workspaces/internal/launchlog"
 	"workspaces/internal/sessions"
 )
@@ -78,19 +79,24 @@ func (a *App) sessionSpace(cfg *config.Spaces, hs *config.Harnesses, harnessName
 	if code != exitOK {
 		return nil, code
 	}
-	dir := h.Env["CLAUDE_CONFIG_DIR"]
-	if dir == "" {
-		if env := a.Getenv("CLAUDE_CONFIG_DIR"); filepath.IsAbs(env) {
-			dir = env
-		} else {
-			dir = filepath.Join(a.home(), ".claude")
-		}
-	}
+	dir := a.claudeConfigDir(h)
 	roots := []string{sp.Root.Path}
 	if sp.Root.Logical != sp.Root.Path {
 		roots = append(roots, sp.Root.Logical)
 	}
 	return &sessionScope{space: sp, harness: harnessName, configDir: dir, roots: roots}, exitOK
+}
+
+// claudeConfigDir is the folder a claude-adapter harness runs with: its own
+// CLAUDE_CONFIG_DIR, then the environment's, then ~/.claude.
+func (a *App) claudeConfigDir(h config.Harness) string {
+	if dir := h.Env["CLAUDE_CONFIG_DIR"]; dir != "" {
+		return dir
+	}
+	if env := a.Getenv("CLAUDE_CONFIG_DIR"); filepath.IsAbs(env) {
+		return env
+	}
+	return filepath.Join(a.home(), ".claude")
 }
 
 func (a *App) loadBoth() (*config.Spaces, *config.Harnesses, int) {
@@ -101,7 +107,7 @@ func (a *App) loadBoth() (*config.Spaces, *config.Harnesses, int) {
 	_, path, err := a.configPaths()
 	var hs *config.Harnesses
 	if err == nil {
-		hs, err = config.LoadHarnesses(path, a.home(), knownAdapter)
+		hs, err = config.LoadHarnesses(path, a.home(), harness.Known)
 	}
 	if err != nil {
 		return nil, nil, a.fail(exitConfig, "%v", err)
@@ -425,6 +431,10 @@ func (a *App) sessionPrune(args []string) int {
 // beside it, and reports whether there was a folder. The folder is removed
 // only when it is a real directory, never a symlink to one.
 func deleteSession(s sessions.Session) (folder bool, err error) {
+	// The id comes from the file name: "..jsonl" would make the folder below the parent of projects/.
+	if !resumableID.MatchString(s.ID) {
+		return false, fmt.Errorf("session file name %q is not a session id; not deleting it", s.ID)
+	}
 	if err := os.Remove(s.Path); err != nil {
 		return false, err
 	}
