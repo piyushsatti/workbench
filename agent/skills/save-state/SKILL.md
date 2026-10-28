@@ -20,6 +20,7 @@ Read [examples.md](references/examples.md) before writing. It contains the node 
 | Transcript | Say `archived` only after writing and verifying an exact raw export; otherwise use `pointer-only` or `unavailable`. |
 | Worktree | Read-only inspection. Never commit, stage, reset, checkout, delete, archive, or rebind. |
 | Side effects | Write the new state node only. Do not mutate memory stores, external notes apps, project notes, configuration, or remote systems. |
+| Routing | The node is continuity state, which the memory rulebook files as operational data under this root. A durable rule, fact or follow-up task found while saving is listed in the node's report to the user with the home the memory rulebook's routing table gives it; filing it there is a separate step the user asks for. |
 
 ## Recipe
 
