@@ -1,0 +1,8 @@
+{
+  "_comment": "Cursor's part of the agent layer, read by scripts/deploy_agent.py. Subagents convert to Cursor frontmatter. Cursor's User Rules live in its settings, not a file, so deploy only reports them.",
+  "targets": [
+    {"src": "subagents", "dest": ".cursor/agents", "convert": "cursor", "suffix": ".md"}
+  ],
+  "rules_copy": null,
+  "manual": "Cursor User Rules live in Cursor Settings > Rules, not a file: paste agent/common/AGENTS.md there by hand (not checked here)"
+}

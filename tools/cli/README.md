@@ -4,7 +4,9 @@ One front door to the workbench repo ([decisions](../../docs/decisions.md#what-e
 
 | Verb | Runs |
 |---|---|
-| `workbench setup [--profile NAME]` | `sudo setup/workstation/bootstrap.sh`, which verifies at the end. Ubuntu 26.04 only; refuses elsewhere. |
+| `workbench install [...]` | `install/install.sh`, arguments passed through: the cross-OS installer (macOS, Ubuntu, Arch). See `install/README.md`. |
+| `workbench update [...]` | `install/install.sh update`: pull workbench, then upgrade what install put in place. |
+| `workbench setup [--profile NAME]` | `sudo setup/workstation/bootstrap.sh`, the pinned Ubuntu 26.04 workstation, which verifies at the end. Refuses elsewhere. |
 | `workbench dotfiles [diff\|apply\|status\|verify]` | `chezmoi --source setup/dotfiles <sub>`. Default `diff`. |
 | `workbench plugins [check\|sync\|lint]` | `scripts/write_catalogs.py` (dry run, or `--apply` for `sync`), then `lint_plugins.py`. Default `check`. |
 | `workbench deploy [--apply] [--harness …]` | `scripts/deploy_agent.py`, arguments passed through. Dry run unless `--apply`. |

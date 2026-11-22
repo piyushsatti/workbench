@@ -1,0 +1,272 @@
+{
+  "_comment": "The install pick-list, read by install/install.py. Each item names what installs it on each system: brew and cask on macos, apt on ubuntu, pacman and aur on arch. An item with no key for a system is not offered there. steps run after packages (install/steps.py); a step may also sit inside one system's block. requires pulls other items in and must name an item listed earlier. skip_on: [omarchy] keeps an item out of a bundle on Omarchy, which ships its own; naming the item with --pick still installs it. Names were checked against formulae.brew.sh, archlinux.org/packages and aur.archlinux.org on 2026-11-17; the ubuntu names are profiles/ubuntu-26.04/apt.txt.",
+  "schema": 1,
+  "groups": ["core", "shell", "dev", "containers", "gui", "agent"],
+  "items": {
+    "base": {
+      "group": "core",
+      "description": "system basics: certificates, curl, gnupg, sudo, archives, ssh client",
+      "macos": {"brew": ["bash", "wget", "gnupg"]},
+      "ubuntu": {"apt": ["bash", "ca-certificates", "curl", "gnupg", "sudo", "tar", "unzip", "wget", "openssh-client", "locales"]},
+      "arch": {"pacman": ["bash", "ca-certificates", "curl", "gnupg", "sudo", "tar", "unzip", "wget", "openssh"]}
+    },
+    "git": {
+      "group": "core",
+      "description": "git",
+      "macos": {"brew": ["git"]},
+      "ubuntu": {"apt": ["git"]},
+      "arch": {"pacman": ["git"]}
+    },
+    "jq": {
+      "group": "core",
+      "description": "jq, a JSON processor",
+      "macos": {"brew": ["jq"]},
+      "ubuntu": {"apt": ["jq"]},
+      "arch": {"pacman": ["jq"]}
+    },
+    "tree": {
+      "group": "core",
+      "description": "tree, a directory lister",
+      "macos": {"brew": ["tree"]},
+      "ubuntu": {"apt": ["tree"]},
+      "arch": {"pacman": ["tree"]}
+    },
+    "chezmoi": {
+      "group": "core",
+      "description": "chezmoi, the dotfiles manager",
+      "macos": {"brew": ["chezmoi"]},
+      "ubuntu": {"steps": [["chezmoi-script"]]},
+      "arch": {"pacman": ["chezmoi"]}
+    },
+    "dotfiles": {
+      "group": "core",
+      "description": "this repo's dotfiles (setup/dotfiles) through chezmoi; asks once for your git name and email",
+      "requires": ["git", "chezmoi"],
+      "skip_on": ["omarchy"],
+      "macos": {},
+      "ubuntu": {},
+      "arch": {},
+      "steps": [["dotfiles"]]
+    },
+    "shell": {
+      "group": "shell",
+      "description": "bash completion and extra terminal definitions",
+      "macos": {"brew": ["bash-completion@2"]},
+      "ubuntu": {"apt": ["bash-completion", "ncurses-term"]},
+      "arch": {"pacman": ["bash-completion"]}
+    },
+    "starship": {
+      "group": "shell",
+      "description": "Starship prompt",
+      "macos": {"brew": ["starship"]},
+      "ubuntu": {"apt": ["starship"]},
+      "arch": {"pacman": ["starship"]}
+    },
+    "btop": {
+      "group": "shell",
+      "description": "btop, a resource monitor",
+      "macos": {"brew": ["btop"]},
+      "ubuntu": {"apt": ["btop"]},
+      "arch": {"pacman": ["btop"]}
+    },
+    "eza": {
+      "group": "shell",
+      "description": "eza, an ls replacement",
+      "macos": {"brew": ["eza"]},
+      "ubuntu": {"apt": ["eza"]},
+      "arch": {"pacman": ["eza"]}
+    },
+    "fd": {
+      "group": "shell",
+      "description": "fd, a find replacement",
+      "macos": {"brew": ["fd"]},
+      "ubuntu": {"apt": ["fd-find"], "steps": [["wrapper", "fd", "fdfind"]]},
+      "arch": {"pacman": ["fd"]}
+    },
+    "fzf": {
+      "group": "shell",
+      "description": "fzf, a fuzzy finder",
+      "macos": {"brew": ["fzf"]},
+      "ubuntu": {"apt": ["fzf"]},
+      "arch": {"pacman": ["fzf"]}
+    },
+    "ripgrep": {
+      "group": "shell",
+      "description": "ripgrep (rg)",
+      "macos": {"brew": ["ripgrep"]},
+      "ubuntu": {"apt": ["ripgrep"]},
+      "arch": {"pacman": ["ripgrep"]}
+    },
+    "zoxide": {
+      "group": "shell",
+      "description": "zoxide, a smarter cd",
+      "macos": {"brew": ["zoxide"]},
+      "ubuntu": {"apt": ["zoxide"]},
+      "arch": {"pacman": ["zoxide"]}
+    },
+    "bat": {
+      "group": "shell",
+      "description": "bat, a cat with highlighting",
+      "macos": {"brew": ["bat"]},
+      "ubuntu": {"apt": ["bat"], "steps": [["wrapper", "bat", "batcat"]]},
+      "arch": {"pacman": ["bat"]}
+    },
+    "lazygit": {
+      "group": "shell",
+      "description": "lazygit, a git TUI",
+      "macos": {"brew": ["lazygit"]},
+      "ubuntu": {"apt": ["lazygit"]},
+      "arch": {"pacman": ["lazygit"]}
+    },
+    "tmux": {
+      "group": "shell",
+      "description": "tmux (its plugins come with the dotfiles)",
+      "macos": {"brew": ["tmux"]},
+      "ubuntu": {"apt": ["tmux"]},
+      "arch": {"pacman": ["tmux"]}
+    },
+    "neovim": {
+      "group": "shell",
+      "description": "Neovim",
+      "macos": {"brew": ["neovim"]},
+      "ubuntu": {"apt": ["neovim"]},
+      "arch": {"pacman": ["neovim"]}
+    },
+    "build-tools": {
+      "group": "dev",
+      "description": "C toolchain, pkg-config, OpenSSL headers, CMake, Ninja (the compiler on macOS comes from the Xcode Command Line Tools)",
+      "macos": {"brew": ["pkgconf", "openssl@3", "cmake", "ninja"]},
+      "ubuntu": {"apt": ["build-essential", "pkg-config", "libssl-dev", "cmake", "ninja-build"]},
+      "arch": {"pacman": ["base-devel", "pkgconf", "openssl", "cmake", "ninja"]}
+    },
+    "python": {
+      "group": "dev",
+      "description": "Python 3 and pipx (on macOS, Homebrew's current Python comes with pipx)",
+      "macos": {"brew": ["pipx"]},
+      "ubuntu": {"apt": ["python3", "python3-venv", "pipx"]},
+      "arch": {"pacman": ["python", "python-pipx"]}
+    },
+    "uv": {
+      "group": "dev",
+      "description": "uv, the Python package manager",
+      "requires": ["python"],
+      "macos": {"brew": ["uv"]},
+      "ubuntu": {"steps": [["pipx", "uv"]]},
+      "arch": {"pacman": ["uv"]}
+    },
+    "node": {
+      "group": "dev",
+      "description": "Node.js and npm",
+      "macos": {"brew": ["node"]},
+      "ubuntu": {"apt": ["nodejs", "npm"]},
+      "arch": {"pacman": ["nodejs", "npm"]}
+    },
+    "rust": {
+      "group": "dev",
+      "description": "Rust and cargo",
+      "macos": {"brew": ["rust"]},
+      "ubuntu": {"apt": ["cargo", "rustc"]},
+      "arch": {"pacman": ["rust"]}
+    },
+    "java": {
+      "group": "dev",
+      "description": "OpenJDK and Maven",
+      "macos": {"brew": ["openjdk", "maven"]},
+      "ubuntu": {"apt": ["default-jdk", "maven"]},
+      "arch": {"pacman": ["jdk-openjdk", "maven"]}
+    },
+    "gh": {
+      "group": "dev",
+      "description": "GitHub CLI",
+      "macos": {"brew": ["gh"]},
+      "ubuntu": {"apt": ["gh"]},
+      "arch": {"pacman": ["github-cli"]}
+    },
+    "docker": {
+      "group": "containers",
+      "description": "Docker with Compose and Buildx (macOS: the docker CLI with Colima as the engine; start it with `colima start`)",
+      "macos": {"brew": ["colima", "docker", "docker-compose", "docker-buildx"]},
+      "ubuntu": {"apt": ["docker.io", "docker-buildx", "docker-compose-v2"], "steps": [["docker-group"]]},
+      "arch": {"pacman": ["docker", "docker-buildx", "docker-compose"], "steps": [["docker-group"]]}
+    },
+    "ghostty": {
+      "group": "gui",
+      "description": "Ghostty terminal",
+      "macos": {"cask": ["ghostty"]},
+      "ubuntu": {"apt": ["ghostty"]},
+      "arch": {"pacman": ["ghostty"]}
+    },
+    "vscode": {
+      "group": "gui",
+      "description": "Visual Studio Code (Ubuntu: from Microsoft's apt repository; Arch: the AUR build of Microsoft's binary)",
+      "macos": {"cask": ["visual-studio-code"]},
+      "ubuntu": {"apt": ["code", "python3-json5"], "before": [["microsoft-code-repo"]]},
+      "arch": {"aur": ["visual-studio-code-bin"]}
+    },
+    "nerd-font": {
+      "group": "gui",
+      "description": "JetBrainsMono Nerd Font",
+      "skip_on": ["omarchy"],
+      "macos": {"cask": ["font-jetbrains-mono-nerd-font"]},
+      "ubuntu": {"steps": [["nerd-font"]]},
+      "arch": {"pacman": ["ttf-jetbrains-mono-nerd"]}
+    },
+    "desktop-linux": {
+      "group": "gui",
+      "description": "fontconfig, Wayland clipboard and xdg-utils",
+      "ubuntu": {"apt": ["fontconfig", "wl-clipboard", "xdg-utils"]},
+      "arch": {"pacman": ["fontconfig", "wl-clipboard", "xdg-utils"]}
+    },
+    "claude": {
+      "group": "agent",
+      "description": "Claude Code CLI (latest from npm when missing; kept when installed, it updates itself)",
+      "requires": ["node"],
+      "macos": {},
+      "ubuntu": {},
+      "arch": {},
+      "steps": [["npm-cli", "claude", "@anthropic-ai/claude-code"]]
+    },
+    "codex": {
+      "group": "agent",
+      "description": "Codex CLI (latest from npm when missing; kept when installed)",
+      "requires": ["node"],
+      "macos": {},
+      "ubuntu": {},
+      "arch": {},
+      "steps": [["npm-cli", "codex", "@openai/codex"]]
+    },
+    "cursor": {
+      "group": "agent",
+      "description": "Cursor editor (macOS cask, Arch AUR; no Ubuntu package here yet)",
+      "macos": {"cask": ["cursor"]},
+      "arch": {"aur": ["cursor-bin"]}
+    },
+    "claude-plugins": {
+      "group": "agent",
+      "description": "the official Claude Code plugins listed in setup/workstation/defaults.yml, when missing",
+      "requires": ["claude"],
+      "macos": {},
+      "ubuntu": {},
+      "arch": {},
+      "steps": [["claude-plugins"]]
+    },
+    "agent-layer": {
+      "group": "agent",
+      "description": "the agent layer in agent/: common rules, skills, hooks and subagents, plus each installed harness's part",
+      "macos": {},
+      "ubuntu": {},
+      "arch": {},
+      "steps": [["agent-layer"]]
+    }
+  },
+  "bundles": {
+    "tools": {
+      "description": "just the tools",
+      "items": ["base", "git", "jq", "tree", "chezmoi", "dotfiles", "shell", "starship", "btop", "eza", "fd", "fzf", "ripgrep", "zoxide", "bat", "lazygit", "tmux", "neovim", "build-tools", "python", "uv", "node", "rust", "java", "gh", "docker", "ghostty", "vscode", "nerd-font", "desktop-linux"]
+    },
+    "tools+agent": {
+      "description": "the tools and the agent layer",
+      "items": ["@tools", "claude", "codex", "cursor", "claude-plugins", "agent-layer"]
+    }
+  }
+}

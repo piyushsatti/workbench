@@ -17,6 +17,7 @@ class WorkbenchTests(unittest.TestCase):
         self.pi, self.log, stubs = root / "workbench", root / "calls.log", root / "stubs"
         for rel in ["scripts/write_catalogs.py", "scripts/lint_plugins.py", "scripts/deploy_agent.py",
                     "scripts/drift_check.py", "setup/workstation/verify.sh", "setup/workstation/bootstrap.sh",
+                    "install/install.sh",
                     "stubs/chezmoi", "stubs/python3", "stubs/sudo", "stubs/uname"]:
             path = (root if rel.startswith("stubs") else self.pi) / rel
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -63,6 +64,14 @@ class WorkbenchTests(unittest.TestCase):
         done, calls = self.run_cli("setup", "--profile", "linux")
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertEqual(calls, ["sudo bootstrap.sh", "bootstrap.sh --profile linux"])
+
+    def test_install_and_update_go_to_the_installer(self):
+        done, calls = self.run_cli("install", "--bundle", "tools")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(calls, ["install.sh --bundle tools"])
+        self.log.unlink()
+        _, calls = self.run_cli("update", "--apply")
+        self.assertEqual(calls, ["install.sh update --apply"])
 
     def test_unknown_verbs_are_refused(self):
         for args in (["bogus"], ["dotfiles", "nuke"], ["plugins", "publish"]):

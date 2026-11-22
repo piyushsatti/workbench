@@ -4,16 +4,17 @@ How I set up a computer, and how I keep the AI agents on it in line. Take what's
 
 ## Install
 
-### A fresh Ubuntu 26.04 machine
+On a fresh machine, macOS, Ubuntu or Arch (Omarchy included):
 
 ```bash
-sudo apt install -y git
+# macOS: xcode-select --install   Ubuntu: sudo apt install -y git   Arch: sudo pacman -S --needed git
 git clone https://github.com/piyushsatti/workbench ~/Source/workbench
-cd ~/Source/workbench/setup/workstation
-sudo ./bootstrap.sh
+~/Source/workbench/install/install.sh
 ```
 
-Setup supports Ubuntu 26.04 only and refuses anything else; on a Mac, use the dotfiles path below and install your own tools. On Ubuntu it installs everything: packages, CLI tools, language runtimes, tmux with its plugins pinned to exact commits, the harness CLIs, and the dotfiles. It checks its own work at the end and tells you what failed. The default profile, `linux-full`, is for a desktop with Ghostty, VS Code and the Nerd Font; add `--profile linux` for a headless box.
+It shows a numbered menu: pick `tools` (just the tools), `tools+agent` (the tools and the agent layer), or single items. It prints the plan and asks before doing anything. The flag form is `--bundle tools+agent`, `--pick tmux,neovim`, `--no-gui` for a headless box and `--apply` to skip the question. Later, `workbench update` pulls this repo and upgrades what it installed. Details: [install/](install/README.md).
+
+On Ubuntu 26.04 there is also the full pinned workstation, `sudo setup/workstation/bootstrap.sh` (`workbench setup`): the same packages plus a locked dotfiles render, pinned tmux plugins, the VS Code extensions and an end-to-end verify.
 
 ### Just the dotfiles (macOS or any Linux)
 
@@ -27,14 +28,14 @@ chezmoi apply
 
 `chezmoi init` asks once for your git name and email. They stay on your machine.
 
-### The agent config and tools
+### The agent layer and tools
 
 ```bash
 ~/Source/workbench/tools/cli/bin/workbench deploy             # dry run: lists what it would copy
 ~/Source/workbench/tools/cli/bin/workbench deploy --apply
 ```
 
-This copies the rulebooks and skills to where Claude Code, Codex, Cursor and OpenCode look for them, and installs git-guard, snippets, the skills' helper scripts and the `workbench` command itself in `~/.local/bin`. From then on it's just `workbench setup`, `workbench dotfiles diff|apply`, `workbench deploy` and `workbench plugins`. It prints the build commands for the Go tools (workspaces, agent-tmux) rather than running them. Add `--harness claude` (or `codex`, `cursor`, `opencode`) to limit it to one harness.
+This copies the agent layer (rules, skills, subagents) to where Claude Code, Codex, Cursor and OpenCode look for them, and installs git-guard, snippets, the skills' helper scripts and the `workbench` command itself in `~/.local/bin`. From then on it's just `workbench install`, `workbench update`, `workbench dotfiles diff|apply`, `workbench deploy` and `workbench plugins`. `workbench install --bundle tools+agent` runs this deploy for you. It prints the build commands for the Go tools (workspaces, agent-tmux) rather than running them. Add `--harness claude` (or `codex`, `cursor`, `opencode`) to limit it to one harness.
 
 ### Plugins from the `pi` marketplace
 
@@ -88,20 +89,19 @@ Anything that only belongs on one machine goes in a `*.local` file next to the m
 
 ### Living with agents
 
-[`agent/`](agent/) is shared configuration for every harness I use:
+[`agent/`](agent/) is the agent layer: a common part every harness reads, and a small part per harness (Claude Code, Codex, Cursor) that says where things go and how they convert.
 
-- **Rulebooks** ([`agent/rulebooks/`](agent/rulebooks/)): how I want an agent to write code, comments and docs, when to ask before acting, how to delegate to subagents, how to report findings. Each one is short and loaded only when it applies.
-- **Skills** ([`agent/skills/`](agent/skills/)): seven global skills. `crucible` reviews a plan or a diff through different professional lenses, up to a red team against a blue team. `dream` mines old transcripts for things worth remembering. `save-state` writes a checkpoint before you walk away. `humanizer`, `grill-me`, `research` and `teach` are borrowed, with credit, from people who wrote them better.
-- **git-guard** ([`agent/hooks/`](agent/hooks/)): a hook that stops an agent from slipping past the git identity check with `--no-verify`, `-c user.email=…`, a swapped `HOME` and the other ways round it.
-- **Sandbox profiles** ([`agent/sandbox/`](agent/sandbox/)): `strict` for repos where a human makes every commit, `permissive` for ones where the agent can do more but still can't force-push or rewrite history.
+- **Skills** ([`agent/common/skills/`](agent/common/skills/)): seven global skills. `crucible` reviews a plan or a diff through different professional lenses, up to a red team against a blue team. `dream` mines old transcripts for things worth remembering. `save-state` writes a checkpoint before you walk away. `humanizer`, `grill-me`, `research` and `teach` are borrowed, with credit, from people who wrote them better.
+- **git-guard** ([`agent/common/hooks/`](agent/common/hooks/)): a hook that stops an agent from slipping past the git identity check with `--no-verify`, `-c user.email=…`, a swapped `HOME` and the other ways round it.
+- **Sandbox profiles** ([`agent/common/sandbox/`](agent/common/sandbox/)): `strict` for repos where a human makes every commit, `permissive` for ones where the agent can do more but still can't force-push or rewrite history.
 
 ### Tools I wrote
 
 - **[workspaces](tools/workspaces/)** starts an agent only from folders I've allowed, always inside tmux, and logs every launch. It's a small Go binary that sits in front of `claude` and `codex`.
 - **[agent-tmux](tools/agent-tmux/)** is an MCP server that lets an agent open its own tmux windows and panes and do its work where I can watch it. It can type into its own panes but never presses Enter, and it won't touch a pane it didn't open.
 - **[snippets](tools/snippets/)** are small reusable instructions ("don't commit", "plan first") that ride along with every prompt until you switch them off.
-- **[workbench](tools/cli/)** is the front door: `workbench setup`, `workbench dotfiles diff`, `workbench deploy`.
-- **[cc-status](harness/claude/)** is a Claude Code footer showing rate limits, context use and what's loaded into memory.
+- **[workbench](tools/cli/)** is the front door: `workbench install`, `workbench update`, `workbench dotfiles diff`, `workbench deploy`.
+- **[cc-status](agent/claude/)** is a Claude Code footer showing rate limits, context use and what's loaded into memory.
 
 ### The `pi` marketplace
 
@@ -113,5 +113,6 @@ Decisions, and the questions that are still open, are in [docs/decisions.md](doc
 
 ```bash
 uv run python -B -m unittest discover -s scripts/tests
+uv run python -B -m unittest discover -s install/tests
 uv run python -B scripts/lint_plugins.py
 ```

@@ -1,0 +1,7 @@
+{
+  "_comment": "OpenCode's part of the agent layer, read by scripts/deploy_agent.py. Subagents convert to OpenCode frontmatter; the rules are copied to its global rules file. Skills: OpenCode reads ~/.agents/skills.",
+  "targets": [
+    {"src": "subagents", "dest": ".config/opencode/agents", "convert": "opencode", "suffix": ".md"}
+  ],
+  "rules_copy": ".config/opencode/AGENTS.md"
+}
