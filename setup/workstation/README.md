@@ -1,5 +1,7 @@
 # Workstation
 
+The full, pinned Ubuntu 26.04 workstation (`workbench setup`). For picking what to install on macOS, Ubuntu or Arch, use `workbench install` ([install/](../../install/README.md)); its Ubuntu `tools` bundle installs the same `apt.txt` packages (a test checks this). This folder stays the Ubuntu configuration engine (locked dotfiles render, tmux plugin pins, VS Code extensions, verify) until the installer takes those over.
+
 Run this on Ubuntu 26.04 LTS from your normal user account:
 
 ```sh

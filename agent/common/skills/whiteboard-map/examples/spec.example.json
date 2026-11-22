@@ -1,0 +1,19 @@
+{"title": "Garden shed build: one frame per subject",
+ "foot": "Long notes live in the project doc; boxes link to it.",
+ "frames": [
+  {"name": "Materials", "status": "list ✓ · order open", "hub": "Materials",
+   "have": ["Timber list from the plan", "Roofing felt: 2 rolls in the garage", ["Supplier price sheet", "https://example.com/prices"]],
+   "shows": ["Shopping list", "Budget sheet", "!Neighbour's spare tiles: not ours to count"],
+   "calls": ["Treated or untreated timber?"],
+   "notes": ["chek the delivery fee\n- before ordering"]},
+  {"name": "Site", "status": "measured", "hub": "Site",
+   "have": ["Ground slopes 8 cm over 2 m", "Mains power 12 m away"],
+   "shows": ["Base plan sketch"],
+   "calls": ["Concrete slab or timber base?", "Run power now or later?"]},
+  {"name": "Permits", "status": "open", "hub": "Permits",
+   "have": ["Under 2.5 m high: usually exempt"],
+   "shows": ["Council planning page"],
+   "calls": ["Confirm the exemption by email?"],
+   "notes": ["ask before buying anything"]}
+ ],
+ "columns": 3}

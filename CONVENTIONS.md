@@ -42,7 +42,7 @@ Every `pi` plugin repo (`~/Source/<name>`, listed in `plugins.json`) follows thi
 
 ## Manifest fields
 
-The field names come from each harness's documentation, as recorded in [harness-parity](agent/docs/harness-parity.md). Fields marked *unverified* still need a V1 or V3 check.
+The field names come from each harness's documentation, as recorded in [harness-parity](agent/common/docs/harness-parity.md). Fields marked *unverified* still need a V1 or V3 check.
 
 | Field | Claude `.claude-plugin/plugin.json` | Codex `.codex-plugin/plugin.json` | Cursor `.cursor-plugin/plugin.json` |
 |---|---|---|---|

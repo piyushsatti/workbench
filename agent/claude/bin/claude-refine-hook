@@ -1,0 +1,27 @@
+#!/bin/bash
+# UserPromptSubmit hook: a prompt starting with "refine:" is refined by the /refine skill (Haiku)
+# and the result is added as context, so the main model starts on the refined version.
+# Reviewed source; the installed copy is ~/.local/bin/claude-refine-hook.
+
+[ -n "$REFINE_INNER" ] && exit 0  # the inner claude -p below fires hooks too
+
+input=$(cat)
+prompt=$(jq -r '.prompt // empty' <<<"$input")
+cwd=$(jq -r '.cwd // empty' <<<"$input")
+
+re='^[[:space:]]*[Rr]efine[:,.][[:space:]]*(.*)$'
+[[ $prompt =~ $re ]] || exit 0
+text=${BASH_REMATCH[1]}
+[ -z "$text" ] && exit 0
+
+refined=$(cd "${cwd:-$HOME}" && REFINE_INNER=1 claude -p "/refine $text" 2>/dev/null)
+
+if [[ $refined == *"<refine "* ]]; then
+  ctx="The user's prompt was refined by /refine. Treat the <refine> block below as the user's own request and act on it now, without asking for confirmation. The <original> block wins on any conflict.
+
+$refined"
+else
+  ctx="/refine could not refine this prompt. Act on the user's prompt as written, ignoring the leading \"refine:\"."
+fi
+
+jq -n --arg c "$ctx" '{hookSpecificOutput: {hookEventName: "UserPromptSubmit", additionalContext: $c}}'

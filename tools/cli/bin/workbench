@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# workbench: one front door to the workbench repo's setup, dotfiles, plugin, deploy and drift scripts.
+# workbench: one front door to the workbench repo's installer, setup, dotfiles, plugin, deploy and drift scripts.
 # Each verb only calls an existing script; this file adds no logic of its own. The workbench checkout is
 # $PI_ROOT, default ~/Source/workbench.
 set -Eeuo pipefail
 
 PI_ROOT="${PI_ROOT:-$HOME/Source/workbench}"
 WORKSTATION="$PI_ROOT/setup/workstation"
+INSTALLER="$PI_ROOT/install"
 SCRIPTS="$PI_ROOT/scripts"
 
 # Repo Python for scripts/ (not bootstrap). Prefer uv when present; else python3.
@@ -23,7 +24,12 @@ usage() {
   cat <<'USAGE'
 usage: workbench <verb> [args]
 
-  setup [--profile NAME]      install the workstation (Ubuntu, sudo); bootstrap verifies at the end
+  install [--bundle B] [--pick a,b] [--no-gui] [--apply]
+                              pick what to install on macOS, Ubuntu or Arch, in one run
+                              (bundles: tools, tools+agent; no picks on a terminal shows a menu)
+  install list                the pick-list for this system
+  update [--apply]            pull workbench, then upgrade what install put in place
+  setup [--profile NAME]      the full pinned Ubuntu 26.04 workstation (sudo); verifies at the end
   dotfiles [diff|apply|status|verify]
                               chezmoi against workbench's dotfiles (default: diff)
   plugins [check|sync|lint]   Claude Code and Codex catalogs, then lint (default: check, a dry run plus lint)
@@ -44,8 +50,10 @@ verb="${1:-help}"
 [[ $# -gt 0 ]] && shift
 
 case "$verb" in
+  install) exec "$INSTALLER/install.sh" "$@" ;;
+  update) exec "$INSTALLER/install.sh" update "$@" ;;
   setup)
-    [[ "$(uname -s)" == Linux ]] || die "setup installs Ubuntu 26.04 only; on $(uname -s) use 'workbench dotfiles' and 'workbench deploy'"
+    [[ "$(uname -s)" == Linux ]] || die "setup is the Ubuntu 26.04 workstation; on $(uname -s) use 'workbench install'"
     # bootstrap.sh ends with its own verify as a fresh login, which already has any new docker group;
     # a second verify from this shell would not, and would fail `docker info`.
     exec sudo "$WORKSTATION/bootstrap.sh" "$@"

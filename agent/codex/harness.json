@@ -1,0 +1,7 @@
+{
+  "_comment": "Codex's part of the agent layer, read by scripts/deploy_agent.py. Subagents convert to TOML. Codex reads the literal text of ~/.codex/AGENTS.md and follows no import, so the rules are copied there. Skills: Codex reads ~/.agents/skills, which the common part fills.",
+  "targets": [
+    {"src": "subagents", "dest": ".codex/agents", "convert": "codex", "suffix": ".toml"}
+  ],
+  "rules_copy": ".codex/AGENTS.md"
+}

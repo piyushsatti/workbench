@@ -1,0 +1,11 @@
+{
+  "_comment": "Claude Code's part of the agent layer, read by scripts/deploy_agent.py. src is relative to agent/common (or to this folder when a target sets from to harness: the Claude-only refine skill and its refiner agent), dest to $HOME. The shim is the one line ~/.claude/CLAUDE.md must hold; deploy checks it and never writes the file. This folder's install.json places the status line and the cc-status mod.",
+  "targets": [
+    {"src": "subagents", "dest": ".claude/agents"},
+    {"src": "skills", "dest": ".claude/skills"},
+    {"src": "subagents", "dest": ".claude/agents", "from": "harness"},
+    {"src": "skills", "dest": ".claude/skills", "from": "harness"}
+  ],
+  "rules_copy": null,
+  "shim": {"file": ".claude/CLAUDE.md", "line": "@~/.agents/AGENTS.md"}
+}

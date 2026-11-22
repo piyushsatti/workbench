@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parents[2] / "agent/bin/lint-agent-files.sh"
+SCRIPT = Path(__file__).resolve().parents[2] / "agent/common/bin/lint-agent-files.sh"
 TOO_LONG = "".join(f"line {n}\n" for n in range(30))  # over the 20-line budget for a project AGENTS.md
 
 

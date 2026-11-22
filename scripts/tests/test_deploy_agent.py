@@ -24,6 +24,16 @@ class DeployAgentTests(unittest.TestCase):
             MODULE.main()
         return out.getvalue()
 
+    def test_each_harness_part_names_real_sources_and_converters(self):
+        for harness in MODULE.HARNESSES:
+            part = MODULE.harness_part(harness)
+            for target in part["targets"]:
+                self.assertTrue(MODULE.target_source(harness, target).exists(), (harness, target))
+                self.assertIn(target.get("convert") or "codex", MODULE.CONVERTERS, (harness, target))
+        self.assertEqual(set(MODULE.rules_copies()), {"shared", "codex", "opencode"})
+        self.assertEqual(MODULE.shim(), "@~/.agents/AGENTS.md")
+        self.assertEqual((MODULE.AGENT_ROOT / "claude/CLAUDE.md").read_text().strip(), MODULE.shim())
+
     def test_dry_run_writes_nothing(self):
         with tempfile.TemporaryDirectory() as temp:
             home = Path(temp)
@@ -40,7 +50,7 @@ class DeployAgentTests(unittest.TestCase):
             (home / ".claude").mkdir()
             (home / ".claude/CLAUDE.md").write_text("my own file\n")
             self.run_main(home, "--apply")
-            self.assertEqual((home / ".agents/AGENTS.md").read_text(), (MODULE.AGENT / "AGENTS.md").read_text())
+            self.assertEqual((home / ".agents/AGENTS.md").read_text(), (MODULE.COMMON / "AGENTS.md").read_text())
             self.assertEqual((home / ".agents/AGENTS.md.pre-deploy").read_text(), "old rules\n")
             self.assertEqual((home / ".claude/CLAUDE.md").read_text(), "my own file\n")
             self.assertTrue((home / ".claude/agents/scrutineer.md").is_file())
@@ -79,7 +89,7 @@ class DeployAgentTests(unittest.TestCase):
             home = Path(temp)
             shared = home / ".agents/AGENTS.md"
             shared.parent.mkdir()
-            edited = (MODULE.AGENT / "AGENTS.md").read_text() + "Memory: read this machine's index.\n"
+            edited = (MODULE.COMMON / "AGENTS.md").read_text() + "Memory: read this machine's index.\n"
             shared.write_text(edited)
             output = self.run_main(home, "--apply")
             self.assertIn(f"CHECK   {shared} has its own content, left as is", output)
@@ -87,9 +97,9 @@ class DeployAgentTests(unittest.TestCase):
             self.assertEqual(shared.read_text(), edited)
             self.assertFalse((home / ".agents/AGENTS.md.pre-deploy").exists())
             # The harness copies still get the canonical rules, not the local line.
-            self.assertEqual((home / ".codex/AGENTS.md").read_text(), (MODULE.AGENT / "AGENTS.md").read_text())
+            self.assertEqual((home / ".codex/AGENTS.md").read_text(), (MODULE.COMMON / "AGENTS.md").read_text())
 
-    def test_claude_settings_are_checked_for_the_status_line_and_mods(self):
+    def test_claude_settings_are_checked_for_the_status_line_mods_and_refine_hook(self):
         with tempfile.TemporaryDirectory() as temp:
             home = Path(temp)
             settings = home / ".claude/settings.json"
@@ -101,17 +111,24 @@ class DeployAgentTests(unittest.TestCase):
             self.assertEqual(settings.read_text(), '{"env": {"CLAUDE_CODE_PLUGIN_DIRS": "~/mods/other"}}')
             self.assertTrue((home / ".local/bin/claude-statusline").stat().st_mode & 0o100)
             self.assertTrue((home / ".local/share/claude-mods/cc-status/hooks/register.tsx").is_file())
+            self.assertIn("does not run the refine hook", output)
+            self.assertTrue((home / ".local/bin/claude-refine-hook").stat().st_mode & 0o100)
+            self.assertTrue((home / ".claude/skills/refine/SKILL.md").is_file())
+            self.assertTrue((home / ".claude/agents/refiner.md").is_file())
+            self.assertFalse((home / ".agents/skills/refine").exists())
             settings.write_text(json.dumps({
                 "statusLine": {"type": "command", "command": "$HOME/.local/bin/claude-statusline"},
-                "env": {"CLAUDE_CODE_PLUGIN_DIRS": f"{home}/.local/share/claude-mods/cc-status"}}))
+                "env": {"CLAUDE_CODE_PLUGIN_DIRS": f"{home}/.local/share/claude-mods/cc-status"},
+                "hooks": {"UserPromptSubmit": [{"hooks": [{"type": "command", "command": MODULE.REFINE_HOOK}]}]}}))
             output = self.run_main(home, "--harness", "claude")
             self.assertNotIn("status line", output)
             self.assertNotIn("does not load", output)
+            self.assertNotIn("refine hook", output)
 
     def test_harness_copy_matching_a_hand_edited_shared_copy_is_left_alone(self):
         with tempfile.TemporaryDirectory() as temp:
             home = Path(temp)
-            edited = (MODULE.AGENT / "AGENTS.md").read_text() + "Memory: read this machine's index.\n"
+            edited = (MODULE.COMMON / "AGENTS.md").read_text() + "Memory: read this machine's index.\n"
             for rel in (".agents/AGENTS.md", ".codex/AGENTS.md", ".config/opencode/AGENTS.md"):
                 (home / rel).parent.mkdir(parents=True, exist_ok=True)
                 (home / rel).write_text(edited)
@@ -126,7 +143,7 @@ class DeployAgentTests(unittest.TestCase):
         known = MODULE.committed_rules()
         if not known:
             self.skipTest("no git history in this checkout")
-        self.assertIn((MODULE.AGENT / "AGENTS.md").read_bytes(), known)
+        self.assertIn((MODULE.COMMON / "AGENTS.md").read_bytes(), known)
 
     def test_skills_deploy_without_their_tests_and_executables(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -146,7 +163,7 @@ class DeployAgentTests(unittest.TestCase):
             for rel in ("SKILL.md", "runtime/scripts/demo.py", "bin/demo", "tests/test_demo.py", "install.json"):
                 (agent / "skills/demo" / rel).parent.mkdir(parents=True, exist_ok=True)
                 (agent / "skills/demo" / rel).write_text("x")
-            with mock.patch.object(MODULE, "AGENT", agent):
+            with mock.patch.object(MODULE, "COMMON", agent):
                 deployed = [target for _, target, _ in MODULE.mapped(agent / "skills", Path("/dest"), None, None)]
             self.assertEqual(deployed, [Path("/dest/demo/SKILL.md")])
 
@@ -159,11 +176,11 @@ class DeployAgentTests(unittest.TestCase):
             self.assertTrue((home / ".claude/agents/mine.md").exists())
 
     def test_extras_are_only_reported_under_skill_folders_deploy_owns(self):
-        # ~/.claude/skills holds skills from other places (synced, plugin-made); only folders agent/skills
+        # ~/.claude/skills holds skills from other places (synced, plugin-made); only folders agent/common/skills
         # names are deploy's to report on.
         with tempfile.TemporaryDirectory() as temp:
             home = Path(temp)
-            owned = next(p.name for p in (MODULE.AGENT / "skills").iterdir() if p.is_dir())
+            owned = next(p.name for p in (MODULE.COMMON / "skills").iterdir() if p.is_dir())
             for folder in (home / ".claude/skills", home / ".agents/skills"):
                 (folder / "synced/other").mkdir(parents=True)
                 (folder / "synced/other/SKILL.md").write_text("x")
@@ -217,7 +234,7 @@ class DeployAgentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             with mock.patch.object(MODULE, "HOME", Path(temp)):
                 files = MODULE.plugin_installs()[0]
-            self.assertIn((MODULE.AGENT / "hooks/git-guard.py", Path(temp) / ".local/bin/git-guard", 0o755), files)
+            self.assertIn((MODULE.COMMON / "hooks/git-guard.py", Path(temp) / ".local/bin/git-guard", 0o755), files)
 
     def test_harness_filter_limits_destinations(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -244,7 +261,7 @@ class DeployAgentTests(unittest.TestCase):
                 self.run_main(home, "--harness", "pi")
 
     def test_codex_agents_are_valid_toml_with_the_body(self):
-        for source in sorted((MODULE.AGENT / "subagents").glob("*.md")):
+        for source in sorted((MODULE.COMMON / "subagents").glob("*.md")):
             fields, body = MODULE.frontmatter(source.read_text())
             data = tomllib.loads(MODULE.to_codex(source.name, source.read_text()))
             self.assertEqual(data["name"], fields["name"])
@@ -268,17 +285,17 @@ class DeployAgentTests(unittest.TestCase):
         self.assertEqual(data["developer_instructions"], awkward)
 
     def test_cursor_agents_get_cursor_frontmatter(self):
-        text = (MODULE.AGENT / "subagents/architect.md").read_text()
+        text = (MODULE.COMMON / "subagents/architect.md").read_text()
         fields, body = MODULE.frontmatter(MODULE.to_cursor("subagents/architect.md", text))
         self.assertEqual(fields["model"], "inherit")
         self.assertEqual(fields["readonly"], "true")
         self.assertNotIn("tools", fields)
         self.assertEqual(body, MODULE.frontmatter(text)[1])
-        scrutineer = MODULE.to_cursor("s.md", (MODULE.AGENT / "subagents/scrutineer.md").read_text())
+        scrutineer = MODULE.to_cursor("s.md", (MODULE.COMMON / "subagents/scrutineer.md").read_text())
         self.assertIn("readonly: false", scrutineer)
 
     def test_opencode_agents_get_opencode_frontmatter(self):
-        text = (MODULE.AGENT / "subagents/architect.md").read_text()
+        text = (MODULE.COMMON / "subagents/architect.md").read_text()
         converted = MODULE.to_opencode("subagents/architect.md", text)
         fields, body = MODULE.frontmatter(converted)
         self.assertEqual(fields["mode"], "subagent")
@@ -297,7 +314,7 @@ class DeployAgentTests(unittest.TestCase):
             home = Path(temp)
             self.run_main(home, "--harness", "opencode", "--apply")
             rules = home / ".config/opencode/AGENTS.md"
-            self.assertEqual(rules.read_text(), (MODULE.AGENT / "AGENTS.md").read_text())
+            self.assertEqual(rules.read_text(), (MODULE.COMMON / "AGENTS.md").read_text())
             self.assertIn("up to date", self.run_main(home, "--harness", "opencode"))
             rules.write_text("my own rules\n")
             self.assertIn("OpenCode reads its literal text", self.run_main(home, "--harness", "opencode", "--apply"))
@@ -307,7 +324,7 @@ class DeployAgentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             home = Path(temp)
             self.run_main(home, "--harness", "codex", "--apply")
-            self.assertEqual((home / ".codex/AGENTS.md").read_text(), (MODULE.AGENT / "AGENTS.md").read_text())
+            self.assertEqual((home / ".codex/AGENTS.md").read_text(), (MODULE.COMMON / "AGENTS.md").read_text())
             self.assertFalse((home / ".codex/AGENTS.md").is_symlink())
             self.assertTrue(tomllib.loads((home / ".codex/agents/scrutineer.toml").read_text()))
             self.assertIn("up to date", self.run_main(home, "--harness", "codex"))
@@ -325,7 +342,7 @@ class DeployAgentTests(unittest.TestCase):
                 path.write_text("old rules\n")
             self.assertIn(f"CHANGED  {home / '.codex/AGENTS.md'}", self.run_main(home, "--harness", "codex"))
             self.run_main(home, "--harness", "codex", "--apply")
-            self.assertEqual((home / ".codex/AGENTS.md").read_text(), (MODULE.AGENT / "AGENTS.md").read_text())
+            self.assertEqual((home / ".codex/AGENTS.md").read_text(), (MODULE.COMMON / "AGENTS.md").read_text())
             self.assertEqual((home / ".codex/AGENTS.md.pre-deploy").read_text(), "old rules\n")
 
     def test_converted_changes_back_up_and_extras_stay(self):

@@ -7,7 +7,7 @@ not pointed at this repo) is listed, never counted as drift.
 
 Checks: shared agent config, skills and plugin executables (deploy_agent.py's plan, for the harnesses
 --harness names), the plugins' conventions (lint_plugins.py), agent instruction files
-(agent/bin/lint-agent-files.sh), dotfiles (chezmoi verify) and the launcher (workspaces doctor).
+(agent/common/bin/lint-agent-files.sh), dotfiles (chezmoi verify) and the launcher (workspaces doctor).
 """
 
 import argparse
@@ -62,7 +62,7 @@ def run(argv, label):
 
 
 def check_agent_files():
-    script = ROOT / "agent/bin/lint-agent-files.sh"
+    script = ROOT / "agent/common/bin/lint-agent-files.sh"
     if not script.exists():
         return "skip", [f"{script} missing"]
     return run(["bash", str(script)], "lint-agent-files")
